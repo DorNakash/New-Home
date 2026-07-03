@@ -29,3 +29,24 @@ export function imageUrl(relativePath: string): string {
   if (relativePath.startsWith("http")) return relativePath;
   return `/uploads/${relativePath}`;
 }
+
+const IMAGE_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+};
+
+export async function downloadImage(imageUrl: string, referer: string): Promise<Buffer | null> {
+  const direct = await fetch(imageUrl, {
+    headers: { ...IMAGE_HEADERS, "Referer": referer },
+    signal: AbortSignal.timeout(5000),
+  }).catch(() => null);
+  if (direct?.ok) return Buffer.from(await direct.arrayBuffer());
+
+  const proxy = await fetch(`https://images.weserv.nl/?url=${encodeURIComponent(imageUrl)}`, {
+    headers: IMAGE_HEADERS,
+    signal: AbortSignal.timeout(5000),
+  }).catch(() => null);
+  if (proxy?.ok) return Buffer.from(await proxy.arrayBuffer());
+
+  return null;
+}

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { query, queryOne } from "../db/index.js";
 import { requireAuth } from "../auth/middleware.js";
-import { saveImage } from "../storage.js";
+import { saveImage, downloadImage } from "../storage.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -130,21 +130,9 @@ router.post("/:id/fetch-image", async (req, res) => {
   const directUrl = typeof req.body?.imageUrl === "string" ? req.body.imageUrl.trim() : null;
   if (directUrl) {
     try {
-      const imgOrigin = new URL(directUrl).origin + "/";
-      const imgRes = await fetch(directUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-          "Accept-Language": "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7",
-          "Referer": item.product_url ?? imgOrigin,
-          "sec-fetch-dest": "image",
-          "sec-fetch-mode": "no-cors",
-          "sec-fetch-site": "same-site",
-        },
-        signal: AbortSignal.timeout(7000),
-      });
-      if (!imgRes.ok) return res.status(422).json({ error: `לא ניתן להוריד את התמונה (${imgRes.status})` });
-      const buffer = Buffer.from(await imgRes.arrayBuffer());
+      const referer = item.product_url ?? new URL(directUrl).origin + "/";
+      const buffer = await downloadImage(directUrl, referer);
+      if (!buffer) return res.status(422).json({ error: "לא ניתן להוריד את התמונה" });
       const ext = directUrl.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i)?.[1] ?? "jpg";
       const path = await saveImage({ buffer, originalname: `img.${ext}` }, req.user!.householdId, req.params.id);
       const updated = await queryOne(
@@ -197,9 +185,8 @@ router.post("/:id/fetch-image", async (req, res) => {
       : new URL(rawUrl, base).toString();
 
     let storedPath: string = imageUrl;
-    const imgRes = await fetch(imageUrl, { headers: { ...browserHeaders, "Referer": item.product_url! }, signal: AbortSignal.timeout(7000) });
-    if (imgRes.ok) {
-      const buffer = Buffer.from(await imgRes.arrayBuffer());
+    const buffer = await downloadImage(imageUrl, item.product_url!);
+    if (buffer) {
       const ext = imageUrl.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i)?.[1] ?? "jpg";
       storedPath = await saveImage({ buffer, originalname: `og.${ext}` }, req.user!.householdId, req.params.id);
     }
