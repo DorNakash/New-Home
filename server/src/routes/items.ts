@@ -196,23 +196,17 @@ router.post("/:id/fetch-image", async (req, res) => {
       ? rawUrl
       : new URL(rawUrl, base).toString();
 
-    const imgRes = await fetch(imageUrl, {
-      headers: browserHeaders,
-      signal: AbortSignal.timeout(7000),
-    });
-    if (!imgRes.ok) return res.status(422).json({ error: "לא ניתן להוריד את התמונה" });
-
-    const buffer = Buffer.from(await imgRes.arrayBuffer());
-    const ext = imageUrl.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i)?.[1] ?? "jpg";
-    const path = await saveImage(
-      { buffer, originalname: `og.${ext}` },
-      req.user!.householdId,
-      req.params.id
-    );
+    let storedPath: string = imageUrl;
+    const imgRes = await fetch(imageUrl, { headers: { ...browserHeaders, "Referer": item.product_url! }, signal: AbortSignal.timeout(7000) });
+    if (imgRes.ok) {
+      const buffer = Buffer.from(await imgRes.arrayBuffer());
+      const ext = imageUrl.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i)?.[1] ?? "jpg";
+      storedPath = await saveImage({ buffer, originalname: `og.${ext}` }, req.user!.householdId, req.params.id);
+    }
 
     const updated = await queryOne(
       "UPDATE items SET image_path = $1, updated_at = now() WHERE id = $2 AND household_id = $3 RETURNING *",
-      [path, req.params.id, req.user!.householdId]
+      [storedPath, req.params.id, req.user!.householdId]
     );
     res.json(updated);
   } catch (err) {

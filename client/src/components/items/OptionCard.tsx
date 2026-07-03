@@ -3,7 +3,7 @@ import { CheckCircle2, ExternalLink, Pencil, Trash2, ImageOff, ImageDown, Loader
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Currency } from "./Currency";
-import { useFetchOptionImage } from "@/lib/queries/options";
+import { useFetchOptionImage, useUpdateOption } from "@/lib/queries/options";
 import { imgSrc } from "@/lib/utils/image";
 import type { ItemOption } from "@/lib/queries/items";
 
@@ -23,6 +23,7 @@ export function OptionCard({
   isSelecting: boolean;
 }) {
   const fetchImage = useFetchOptionImage(option.id, itemId);
+  const updateOption = useUpdateOption(itemId);
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualImageUrl, setManualImageUrl] = useState("");
 
@@ -73,17 +74,17 @@ export function OptionCard({
               onKeyDown={(e) => {
                 if (e.key === "Escape") { setShowManualInput(false); setManualImageUrl(""); }
                 if (e.key === "Enter" && manualImageUrl.trim()) {
-                  fetchImage.mutate(manualImageUrl.trim(), { onSuccess: () => { setShowManualInput(false); setManualImageUrl(""); } });
+                  updateOption.mutate({ id: option.id, image_path: manualImageUrl.trim() }, { onSuccess: () => { setShowManualInput(false); setManualImageUrl(""); } });
                 }
               }}
             />
             <Button
               size="sm"
               className="h-7 px-2 text-xs"
-              disabled={!manualImageUrl.trim() || fetchImage.isPending}
-              onClick={() => fetchImage.mutate(manualImageUrl.trim(), { onSuccess: () => { setShowManualInput(false); setManualImageUrl(""); } })}
+              disabled={!manualImageUrl.trim() || updateOption.isPending}
+              onClick={() => updateOption.mutate({ id: option.id, image_path: manualImageUrl.trim() }, { onSuccess: () => { setShowManualInput(false); setManualImageUrl(""); } })}
             >
-              {fetchImage.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "שמור"}
+              {updateOption.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "שמור"}
             </Button>
             <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={() => { setShowManualInput(false); setManualImageUrl(""); }}>×</Button>
           </div>

@@ -11,7 +11,7 @@ import { PriorityStars } from "@/components/items/PriorityStars";
 import { OptionCard } from "@/components/items/OptionCard";
 import { OptionFormDialog } from "@/components/items/OptionFormDialog";
 import { ItemFormDialog } from "@/components/items/ItemFormDialog";
-import { useItem, useDeleteItem, useFetchItemImage, type ItemOption } from "@/lib/queries/items";
+import { useItem, useDeleteItem, useFetchItemImage, useUpdateItem, type ItemOption } from "@/lib/queries/items";
 import { imgSrc } from "@/lib/utils/image";
 import { useDeleteOption, useSelectOption } from "@/lib/queries/options";
 import type { Item } from "@/lib/queries/rooms";
@@ -24,6 +24,7 @@ export function ItemPage() {
   const selectOption = useSelectOption(itemId ?? "");
   const deleteOption = useDeleteOption(itemId ?? "");
   const deleteItem = useDeleteItem(item?.room_id ?? "");
+  const updateItem = useUpdateItem(item?.room_id ?? "");
   const fetchImage = useFetchItemImage(itemId ?? "", item?.room_id ?? "");
 
   const [editOpen, setEditOpen] = useState(false);
@@ -158,13 +159,13 @@ export function ItemPage() {
                     onKeyDown={(e) => {
                       if (e.key === "Escape") { setShowManualInput(false); setManualImageUrl(""); }
                       if (e.key === "Enter" && manualImageUrl.trim()) {
-                        fetchImage.mutate(manualImageUrl.trim(), { onSuccess: () => { setShowManualInput(false); setManualImageUrl(""); } });
+                        updateItem.mutate({ id: item.id, image_path: manualImageUrl.trim() }, { onSuccess: () => { setShowManualInput(false); setManualImageUrl(""); } });
                       }
                     }}
                   />
-                  <Button size="sm" className="h-8 px-3" disabled={!manualImageUrl.trim() || fetchImage.isPending}
-                    onClick={() => fetchImage.mutate(manualImageUrl.trim(), { onSuccess: () => { setShowManualInput(false); setManualImageUrl(""); } })}>
-                    {fetchImage.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "שמור"}
+                  <Button size="sm" className="h-8 px-3" disabled={!manualImageUrl.trim() || updateItem.isPending}
+                    onClick={() => updateItem.mutate({ id: item.id, image_path: manualImageUrl.trim() }, { onSuccess: () => { setShowManualInput(false); setManualImageUrl(""); } })}>
+                    {updateItem.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "שמור"}
                   </Button>
                   <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => { setShowManualInput(false); setManualImageUrl(""); }}>×</Button>
                 </div>

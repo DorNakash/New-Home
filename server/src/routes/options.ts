@@ -136,13 +136,14 @@ router.post("/options/:id/fetch-image", async (req, res) => {
       ? `${base.protocol}${rawUrl}`
       : rawUrl.startsWith("http") ? rawUrl : new URL(rawUrl, base).toString();
 
-    const imgRes = await fetch(imageUrl, { headers: browserHeaders, signal: AbortSignal.timeout(7000) });
-    if (!imgRes.ok) return res.status(422).json({ error: "לא ניתן להוריד את התמונה" });
-
-    const buffer = Buffer.from(await imgRes.arrayBuffer());
-    const ext = imageUrl.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i)?.[1] ?? "jpg";
-    const path = await saveImage({ buffer, originalname: `og.${ext}` }, req.user!.householdId, option.item_id);
-    const updated = await queryOne("UPDATE item_options SET image_path = $1 WHERE id = $2 RETURNING *", [path, req.params.id]);
+    let storedPath: string = imageUrl;
+    const imgRes = await fetch(imageUrl, { headers: { ...browserHeaders, "Referer": option.product_url! }, signal: AbortSignal.timeout(7000) });
+    if (imgRes.ok) {
+      const buffer = Buffer.from(await imgRes.arrayBuffer());
+      const ext = imageUrl.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i)?.[1] ?? "jpg";
+      storedPath = await saveImage({ buffer, originalname: `og.${ext}` }, req.user!.householdId, option.item_id);
+    }
+    const updated = await queryOne("UPDATE item_options SET image_path = $1 WHERE id = $2 RETURNING *", [storedPath, req.params.id]);
     res.json(updated);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "";
