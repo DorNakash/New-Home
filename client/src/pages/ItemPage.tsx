@@ -222,7 +222,7 @@ export function ItemPage() {
                 <OptionCard
                   key={option.id}
                   option={option}
-                  itemId={itemId}
+                  itemId={itemId ?? ""}
                   isSelecting={selectingId === option.id}
                   onSelect={() => handleSelect(option.id)}
                   onEdit={() => openEditOption(option)}

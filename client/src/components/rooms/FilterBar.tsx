@@ -62,7 +62,7 @@ export function FilterBar({
         </Select>
       )}
 
-      <Select value={filters.priority || "all"} onValueChange={(v) => onChange({ ...filters, priority: v === "all" ? "" : v })}>
+      <Select value={filters.priority || "all"} onValueChange={(v) => onChange({ ...filters, priority: v === "all" ? "" : (v ?? "") })}>
         <SelectTrigger className="h-8 w-32 text-xs">
           <SelectValue placeholder="כל העדיפויות">
             {(v: string) => (v === "all" || !v ? "כל העדיפויות" : (PRIORITY_LABELS[v] ?? v))}
