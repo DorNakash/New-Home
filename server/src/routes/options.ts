@@ -85,7 +85,7 @@ router.post("/options/:id/fetch-image", async (req, res) => {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
           "Referer": option.product_url ?? directUrl,
         },
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(7000),
       });
       if (!imgRes.ok) return res.status(422).json({ error: `לא ניתן להוריד את התמונה (${imgRes.status})` });
       const buffer = Buffer.from(await imgRes.arrayBuffer());
@@ -111,7 +111,7 @@ router.post("/options/:id/fetch-image", async (req, res) => {
       "Cache-Control": "no-cache",
     };
 
-    const pageRes = await fetch(option.product_url, { headers: browserHeaders, signal: AbortSignal.timeout(15000) });
+    const pageRes = await fetch(option.product_url, { headers: browserHeaders, signal: AbortSignal.timeout(7000) });
     if (!pageRes.ok) return res.status(502).json({ error: `שגיאה בגישה לדף (${pageRes.status})` });
     const html = await pageRes.text();
 
@@ -130,7 +130,7 @@ router.post("/options/:id/fetch-image", async (req, res) => {
       ? `${base.protocol}${rawUrl}`
       : rawUrl.startsWith("http") ? rawUrl : new URL(rawUrl, base).toString();
 
-    const imgRes = await fetch(imageUrl, { headers: browserHeaders, signal: AbortSignal.timeout(15000) });
+    const imgRes = await fetch(imageUrl, { headers: browserHeaders, signal: AbortSignal.timeout(7000) });
     if (!imgRes.ok) return res.status(422).json({ error: "לא ניתן להוריד את התמונה" });
 
     const buffer = Buffer.from(await imgRes.arrayBuffer());
