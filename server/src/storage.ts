@@ -38,13 +38,13 @@ const IMAGE_HEADERS = {
 export async function downloadImage(imageUrl: string, referer: string): Promise<Buffer | null> {
   const direct = await fetch(imageUrl, {
     headers: { ...IMAGE_HEADERS, "Referer": referer },
-    signal: AbortSignal.timeout(5000),
+    signal: AbortSignal.timeout(2500),
   }).catch(() => null);
   if (direct?.ok) return Buffer.from(await direct.arrayBuffer());
 
   const proxy = await fetch(`https://images.weserv.nl/?url=${encodeURIComponent(imageUrl)}`, {
     headers: IMAGE_HEADERS,
-    signal: AbortSignal.timeout(5000),
+    signal: AbortSignal.timeout(2500),
   }).catch(() => null);
   if (proxy?.ok) return Buffer.from(await proxy.arrayBuffer());
 

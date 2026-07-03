@@ -105,7 +105,7 @@ router.post("/options/:id/fetch-image", async (req, res) => {
       "Cache-Control": "no-cache",
     };
 
-    const pageRes = await fetch(option.product_url, { headers: browserHeaders, signal: AbortSignal.timeout(7000) });
+    const pageRes = await fetch(option.product_url, { headers: browserHeaders, signal: AbortSignal.timeout(3000) });
     if (!pageRes.ok) return res.status(502).json({ error: `שגיאה בגישה לדף (${pageRes.status})` });
     const html = await pageRes.text();
 
