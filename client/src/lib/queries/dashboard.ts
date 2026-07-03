@@ -6,6 +6,7 @@ export interface RoomSummary {
   name: string;
   icon: string | null;
   spent: number;
+  planned: number;
   itemCount: number;
   percentComplete: number;
 }

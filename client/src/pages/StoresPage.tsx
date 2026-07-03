@@ -12,7 +12,7 @@ import { useState } from "react";
 import type { Item } from "@/lib/queries/rooms";
 import type { SearchItem } from "@/lib/queries/items";
 
-function StoreItemsSection({ storeId, storeName }: { storeId: string; storeName: string }) {
+function StoreItemsSection({ storeId }: { storeId: string; storeName: string }) {
   const { data: items, isLoading } = useSearchItems({ store_id: storeId });
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [formOpen, setFormOpen] = useState(false);
