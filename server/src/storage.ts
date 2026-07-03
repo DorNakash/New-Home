@@ -37,14 +37,39 @@ const PAGE_HEADERS = {
   "Cache-Control": "no-cache",
 };
 
-export async function fetchPageHtml(url: string): Promise<string | null> {
-  const direct = await fetch(url, { headers: PAGE_HEADERS, signal: AbortSignal.timeout(2500) }).catch(() => null);
-  if (direct?.ok) return direct.text();
+function extractOgImage(html: string, productUrl: string): string | null {
+  const patterns = [
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+    /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
+  ];
+  let rawUrl: string | undefined;
+  for (const re of patterns) { rawUrl = html.match(re)?.[1]; if (rawUrl) break; }
+  if (!rawUrl) return null;
+  const base = new URL(productUrl);
+  return rawUrl.startsWith("//") ? `${base.protocol}${rawUrl}`
+    : rawUrl.startsWith("http") ? rawUrl
+    : new URL(rawUrl, base).toString();
+}
 
-  const proxy = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, {
-    signal: AbortSignal.timeout(3500),
-  }).catch(() => null);
-  if (proxy?.ok) return proxy.text();
+export async function fetchOgImage(productUrl: string): Promise<string | null> {
+  // Microlink handles anti-bot, Cloudflare, and geo-blocked Israeli sites
+  const ml = await fetch(
+    `https://api.microlink.io/?url=${encodeURIComponent(productUrl)}`,
+    { signal: AbortSignal.timeout(6000) }
+  ).catch(() => null);
+  if (ml?.ok) {
+    const body = await ml.json() as { status: string; data?: { image?: { url?: string } } };
+    if (body.status === "success" && body.data?.image?.url) return body.data.image.url;
+  }
+
+  // Fallback: fetch HTML directly and parse og:image
+  const direct = await fetch(productUrl, { headers: PAGE_HEADERS, signal: AbortSignal.timeout(2000) }).catch(() => null);
+  if (direct?.ok) {
+    const img = extractOgImage(await direct.text(), productUrl);
+    if (img) return img;
+  }
 
   return null;
 }

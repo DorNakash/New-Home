@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { query, queryOne } from "../db/index.js";
 import { requireAuth } from "../auth/middleware.js";
-import { saveImage, downloadImage, fetchPageHtml } from "../storage.js";
+import { saveImage, downloadImage, fetchOgImage } from "../storage.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -148,33 +148,11 @@ router.post("/:id/fetch-image", async (req, res) => {
   if (!item.product_url) return res.status(400).json({ error: "אין קישור למוצר" });
 
   try {
-    const html = await fetchPageHtml(item.product_url);
-    if (!html) return res.status(502).json({ error: "לא ניתן לגשת לדף המוצר" });
-
-    // Try og:image first, then twitter:image
-    const patterns = [
-      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
-      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
-    ];
-    let rawUrl: string | undefined;
-    for (const re of patterns) {
-      rawUrl = html.match(re)?.[1];
-      if (rawUrl) break;
-    }
-    if (!rawUrl) return res.status(422).json({ error: "לא נמצאה תמונה בדף המוצר" });
-
-    // Resolve protocol-relative and relative URLs
-    const base = new URL(item.product_url);
-    const imageUrl = rawUrl.startsWith("//")
-      ? `${base.protocol}${rawUrl}`
-      : rawUrl.startsWith("http")
-      ? rawUrl
-      : new URL(rawUrl, base).toString();
+    const imageUrl = await fetchOgImage(item.product_url);
+    if (!imageUrl) return res.status(422).json({ error: "לא נמצאה תמונה בדף המוצר" });
 
     let storedPath: string = imageUrl;
-    const buffer = await downloadImage(imageUrl, item.product_url!);
+    const buffer = await downloadImage(imageUrl, item.product_url);
     if (buffer) {
       const ext = imageUrl.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i)?.[1] ?? "jpg";
       storedPath = await saveImage({ buffer, originalname: `og.${ext}` }, req.user!.householdId, req.params.id);

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { queryOne, transaction } from "../db/index.js";
 import { requireAuth } from "../auth/middleware.js";
-import { saveImage, downloadImage, fetchPageHtml } from "../storage.js";
+import { saveImage, downloadImage, fetchOgImage } from "../storage.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -98,26 +98,11 @@ router.post("/options/:id/fetch-image", async (req, res) => {
   if (!option.product_url) return res.status(400).json({ error: "אין קישור למוצר" });
 
   try {
-    const html = await fetchPageHtml(option.product_url);
-    if (!html) return res.status(502).json({ error: "לא ניתן לגשת לדף המוצר" });
-
-    const patterns = [
-      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
-      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
-    ];
-    let rawUrl: string | undefined;
-    for (const re of patterns) { rawUrl = html.match(re)?.[1]; if (rawUrl) break; }
-    if (!rawUrl) return res.status(422).json({ error: "לא נמצאה תמונה בדף המוצר" });
-
-    const base = new URL(option.product_url);
-    const imageUrl = rawUrl.startsWith("//")
-      ? `${base.protocol}${rawUrl}`
-      : rawUrl.startsWith("http") ? rawUrl : new URL(rawUrl, base).toString();
+    const imageUrl = await fetchOgImage(option.product_url);
+    if (!imageUrl) return res.status(422).json({ error: "לא נמצאה תמונה בדף המוצר" });
 
     let storedPath: string = imageUrl;
-    const buffer = await downloadImage(imageUrl, option.product_url!);
+    const buffer = await downloadImage(imageUrl, option.product_url);
     if (buffer) {
       const ext = imageUrl.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i)?.[1] ?? "jpg";
       storedPath = await saveImage({ buffer, originalname: `og.${ext}` }, req.user!.householdId, option.item_id);
