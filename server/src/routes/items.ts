@@ -130,10 +130,16 @@ router.post("/:id/fetch-image", async (req, res) => {
   const directUrl = typeof req.body?.imageUrl === "string" ? req.body.imageUrl.trim() : null;
   if (directUrl) {
     try {
+      const imgOrigin = new URL(directUrl).origin + "/";
       const imgRes = await fetch(directUrl, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          "Referer": item.product_url ?? directUrl,
+          "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+          "Accept-Language": "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7",
+          "Referer": item.product_url ?? imgOrigin,
+          "sec-fetch-dest": "image",
+          "sec-fetch-mode": "no-cors",
+          "sec-fetch-site": "same-site",
         },
         signal: AbortSignal.timeout(7000),
       });
