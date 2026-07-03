@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { query, queryOne } from "../db/index.js";
 import { requireAuth } from "../auth/middleware.js";
-import { saveImage, downloadImage } from "../storage.js";
+import { saveImage, downloadImage, fetchPageHtml } from "../storage.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -148,19 +148,8 @@ router.post("/:id/fetch-image", async (req, res) => {
   if (!item.product_url) return res.status(400).json({ error: "אין קישור למוצר" });
 
   try {
-    const browserHeaders = {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-      "Accept-Language": "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7",
-      "Cache-Control": "no-cache",
-    };
-
-    const pageRes = await fetch(item.product_url, {
-      headers: browserHeaders,
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!pageRes.ok) return res.status(502).json({ error: `שגיאה בגישה לדף (${pageRes.status})` });
-    const html = await pageRes.text();
+    const html = await fetchPageHtml(item.product_url);
+    if (!html) return res.status(502).json({ error: "לא ניתן לגשת לדף המוצר" });
 
     // Try og:image first, then twitter:image
     const patterns = [
