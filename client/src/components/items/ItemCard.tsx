@@ -5,13 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Currency } from "./Currency";
 import { StatusBadge } from "./StatusBadge";
 import { PriorityStars } from "./PriorityStars";
-import { useUpdateItem } from "@/lib/queries/items";
 import { imgSrc } from "@/lib/utils/image";
 import type { Item } from "@/lib/queries/rooms";
 
 export function ItemCard({ item, onEdit }: { item: Item; onEdit: () => void }) {
   const navigate = useNavigate();
-  const updateItem = useUpdateItem(item.room_id ?? "");
   const price = Number(item.actual_price ?? item.planned_price ?? 0);
 
   return (

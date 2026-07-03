@@ -32,7 +32,7 @@ export function FilterBar({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Select value={filters.status || "all"} onValueChange={(v) => onChange({ ...filters, status: v === "all" ? "" : v })}>
+      <Select value={filters.status || "all"} onValueChange={(v) => onChange({ ...filters, status: v === "all" ? "" : (v ?? "") })}>
         <SelectTrigger className="h-8 w-36 text-xs">
           <SelectValue placeholder="כל הסטטוסים">
             {(v: string) => (v === "all" || !v ? "כל הסטטוסים" : (STATUS_LABELS[v] ?? v))}
@@ -47,7 +47,7 @@ export function FilterBar({
       </Select>
 
       {categories.length > 0 && (
-        <Select value={filters.categoryId || "all"} onValueChange={(v) => onChange({ ...filters, categoryId: v === "all" ? "" : v })}>
+        <Select value={filters.categoryId || "all"} onValueChange={(v) => onChange({ ...filters, categoryId: v === "all" ? "" : (v ?? "") })}>
           <SelectTrigger className="h-8 w-36 text-xs">
             <SelectValue placeholder="כל הקטגוריות">
               {(v: string) => (v === "all" || !v ? "כל הקטגוריות" : (categories.find(([id]) => id === v)?.[1] ?? v))}
