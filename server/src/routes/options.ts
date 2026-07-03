@@ -110,9 +110,10 @@ router.post("/options/:id/fetch-image", async (req, res) => {
     const updated = await queryOne("UPDATE item_options SET image_path = $1 WHERE id = $2 RETURNING *", [storedPath, req.params.id]);
     res.json(updated);
   } catch (err) {
+    console.error("[fetch-image option]", err);
     const msg = err instanceof Error ? err.message : "";
     if (msg.includes("abort") || msg.includes("timeout")) return res.status(504).json({ error: "הדף לא הגיב בזמן" });
-    res.status(502).json({ error: "לא ניתן לגשת לדף המוצר" });
+    res.status(502).json({ error: String(err) });
   }
 });
 

@@ -164,11 +164,12 @@ router.post("/:id/fetch-image", async (req, res) => {
     );
     res.json(updated);
   } catch (err) {
+    console.error("[fetch-image item]", err);
     const msg = err instanceof Error ? err.message : "";
     if (msg.includes("abort") || msg.includes("timeout")) {
       return res.status(504).json({ error: "הדף לא הגיב בזמן" });
     }
-    res.status(502).json({ error: "לא ניתן לגשת לדף המוצר" });
+    res.status(502).json({ error: String(err) });
   }
 });
 

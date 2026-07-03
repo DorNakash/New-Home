@@ -54,22 +54,26 @@ function extractOgImage(html: string, productUrl: string): string | null {
 }
 
 export async function fetchOgImage(productUrl: string): Promise<string | null> {
-  // Microlink handles anti-bot, Cloudflare, and geo-blocked Israeli sites
-  const ml = await fetch(
-    `https://api.microlink.io/?url=${encodeURIComponent(productUrl)}`,
-    { signal: AbortSignal.timeout(6000) }
-  ).catch(() => null);
-  if (ml?.ok) {
-    const body = await ml.json() as { status: string; data?: { image?: { url?: string } } };
-    if (body.status === "success" && body.data?.image?.url) return body.data.image.url;
-  }
+  try {
+    // Microlink handles anti-bot, Cloudflare, and geo-blocked Israeli sites
+    const ml = await fetch(
+      `https://api.microlink.io/?url=${encodeURIComponent(productUrl)}`,
+      { signal: AbortSignal.timeout(6000) }
+    ).catch(() => null);
+    if (ml?.ok) {
+      const body = await ml.json().catch(() => null) as { status: string; data?: { image?: { url?: string } } } | null;
+      if (body?.status === "success" && body.data?.image?.url) return body.data.image.url;
+    }
+  } catch { /* Microlink unavailable */ }
 
-  // Fallback: fetch HTML directly and parse og:image
-  const direct = await fetch(productUrl, { headers: PAGE_HEADERS, signal: AbortSignal.timeout(2000) }).catch(() => null);
-  if (direct?.ok) {
-    const img = extractOgImage(await direct.text(), productUrl);
-    if (img) return img;
-  }
+  try {
+    // Fallback: fetch HTML directly and parse og:image
+    const direct = await fetch(productUrl, { headers: PAGE_HEADERS, signal: AbortSignal.timeout(2000) });
+    if (direct.ok) {
+      const img = extractOgImage(await direct.text(), productUrl);
+      if (img) return img;
+    }
+  } catch { /* site blocked or timeout */ }
 
   return null;
 }
@@ -80,17 +84,21 @@ const IMAGE_HEADERS = {
 };
 
 export async function downloadImage(imageUrl: string, referer: string): Promise<Buffer | null> {
-  const direct = await fetch(imageUrl, {
-    headers: { ...IMAGE_HEADERS, "Referer": referer },
-    signal: AbortSignal.timeout(2500),
-  }).catch(() => null);
-  if (direct?.ok) return Buffer.from(await direct.arrayBuffer());
+  try {
+    const direct = await fetch(imageUrl, {
+      headers: { ...IMAGE_HEADERS, "Referer": referer },
+      signal: AbortSignal.timeout(2000),
+    });
+    if (direct.ok) return Buffer.from(await direct.arrayBuffer());
+  } catch { /* blocked or dropped */ }
 
-  const proxy = await fetch(`https://images.weserv.nl/?url=${encodeURIComponent(imageUrl)}`, {
-    headers: IMAGE_HEADERS,
-    signal: AbortSignal.timeout(2500),
-  }).catch(() => null);
-  if (proxy?.ok) return Buffer.from(await proxy.arrayBuffer());
+  try {
+    const proxy = await fetch(`https://images.weserv.nl/?url=${encodeURIComponent(imageUrl)}`, {
+      headers: IMAGE_HEADERS,
+      signal: AbortSignal.timeout(2000),
+    });
+    if (proxy.ok) return Buffer.from(await proxy.arrayBuffer());
+  } catch { /* proxy failed */ }
 
   return null;
 }
