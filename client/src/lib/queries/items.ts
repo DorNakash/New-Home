@@ -41,6 +41,7 @@ export interface ItemDetail {
 
 export interface SearchItem {
   id: string;
+  room_id: string;
   name: string;
   room_name: string;
   category_name: string | null;
@@ -70,6 +71,16 @@ export function useSearchItems(params: {
   });
 }
 
+export function useDashboardItems(params: { statuses?: string[]; enabled?: boolean }) {
+  const qs = new URLSearchParams();
+  if (params.statuses?.length) qs.set("status", params.statuses.join(","));
+  return useQuery<SearchItem[]>({
+    queryKey: ["dashboard-items", params.statuses ?? "all"],
+    queryFn: () => api<SearchItem[]>(`/api/items?${qs}`),
+    enabled: params.enabled !== false,
+  });
+}
+
 export function useItem(itemId: string | undefined) {
   return useQuery<ItemDetail>({
     queryKey: ["item", itemId],
@@ -94,13 +105,25 @@ export interface ItemInput {
   is_required?: boolean;
 }
 
+function autoFetchImage(itemId: string, item: { product_url?: string | null; image_path?: string | null }, invalidate: () => void) {
+  if (!item.product_url || item.image_path) return;
+  api(`/api/items/${itemId}/fetch-image`, { method: "POST", body: JSON.stringify({}) })
+    .then(invalidate)
+    .catch(() => {}); // Silent failure — ImageDown button always available as fallback
+}
+
 export function useCreateItem() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: ItemInput) => api("/api/items", { method: "POST", body: JSON.stringify(input) }),
-    onSuccess: (_data, variables) => {
+    mutationFn: (input: ItemInput) =>
+      api<{ id: string; product_url: string | null; image_path: string | null }>("/api/items", { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["room", variables.room_id] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      autoFetchImage(data.id, data, () => {
+        queryClient.invalidateQueries({ queryKey: ["room", variables.room_id] });
+        queryClient.invalidateQueries({ queryKey: ["item", data.id] });
+      });
     },
   });
 }
@@ -109,11 +132,18 @@ export function useUpdateItem(roomId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...input }: Partial<ItemInput> & { id: string }) =>
-      api(`/api/items/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
-    onSuccess: (_data, variables) => {
+      api<{ id: string; product_url: string | null; image_path: string | null }>(`/api/items/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["room", roomId] });
       queryClient.invalidateQueries({ queryKey: ["item", variables.id] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      // Auto-fetch when product_url is being set/changed
+      if ("product_url" in variables) {
+        autoFetchImage(data.id, data, () => {
+          queryClient.invalidateQueries({ queryKey: ["room", roomId] });
+          queryClient.invalidateQueries({ queryKey: ["item", data.id] });
+        });
+      }
     },
   });
 }
@@ -154,6 +184,9 @@ export async function uploadItemImage(file: File, itemId: string): Promise<{ pat
     credentials: "include",
     body: formData,
   });
-  if (!res.ok) throw new Error("העלאת התמונה נכשלה");
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || "העלאת התמונה נכשלה");
+  }
   return res.json();
 }

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Currency } from "@/components/items/Currency";
 import { RoomFormDialog } from "@/components/rooms/RoomFormDialog";
+import { ItemsListDialog } from "@/components/items/ItemsListDialog";
 import { useDashboardSummary, useUpdateBudget } from "@/lib/queries/dashboard";
 
 function SummaryCard({
@@ -14,14 +15,19 @@ function SummaryCard({
   label,
   value,
   colorClass,
+  onClick,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: React.ReactNode;
   colorClass: string;
+  onClick?: () => void;
 }) {
   return (
-    <Card>
+    <Card
+      className={onClick ? "cursor-pointer transition-shadow hover:shadow-md" : undefined}
+      onClick={onClick}
+    >
       <CardContent className="flex items-center gap-3 py-4">
         <div className={`flex h-9 w-9 items-center justify-center rounded-full ${colorClass}`}>
           <Icon className="h-4 w-4" />
@@ -103,6 +109,8 @@ const ROOM_ACCENTS = [
   "bg-teal-100 dark:bg-teal-900/40",
 ];
 
+type ItemsDialog = { title: string; statuses?: string[] } | null;
+
 export function DashboardPage() {
   const { data, isLoading } = useDashboardSummary();
   const navigate = useNavigate();
@@ -110,6 +118,7 @@ export function DashboardPage() {
     null
   );
   const [roomFormOpen, setRoomFormOpen] = useState(false);
+  const [itemsDialog, setItemsDialog] = useState<ItemsDialog>(null);
 
   function openCreateRoom() {
     setEditingRoom(null);
@@ -161,36 +170,42 @@ export function DashboardPage() {
           label="שולם עד כה"
           value={<Currency value={data.totalSpent ?? 0} />}
           colorClass="bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300"
+          onClick={() => setItemsDialog({ title: "שולם עד כה", statuses: ["ORDERED", "ARRIVED", "INSTALLED"] })}
         />
         <SummaryCard
           icon={CreditCard}
           label="מתוכנן (כל הפריטים)"
           value={<Currency value={data.totalPlanned} />}
           colorClass="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+          onClick={() => setItemsDialog({ title: "כל הפריטים" })}
         />
         <SummaryCard
           icon={Package}
           label="מספר פריטים"
           value={data.itemCount}
           colorClass="bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300"
+          onClick={() => setItemsDialog({ title: "כל הפריטים" })}
         />
         <SummaryCard
           icon={ShoppingCart}
           label="נשאר לקנות"
           value={data.toBuyCount}
           colorClass="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+          onClick={() => setItemsDialog({ title: "נשאר לקנות", statuses: ["SEARCHING", "READY_TO_ORDER"] })}
         />
         <SummaryCard
           icon={Truck}
           label="הוזמן"
           value={data.orderedCount}
           colorClass="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
+          onClick={() => setItemsDialog({ title: "הוזמן", statuses: ["ORDERED"] })}
         />
         <SummaryCard
           icon={CheckCircle2}
           label="הותקן"
           value={data.installedCount}
           colorClass="bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
+          onClick={() => setItemsDialog({ title: "הותקן", statuses: ["INSTALLED"] })}
         />
       </section>
 
@@ -250,6 +265,12 @@ export function DashboardPage() {
       </section>
 
       <RoomFormDialog room={editingRoom} open={roomFormOpen} onOpenChange={setRoomFormOpen} />
+      <ItemsListDialog
+        open={!!itemsDialog}
+        onOpenChange={(open) => { if (!open) setItemsDialog(null); }}
+        title={itemsDialog?.title ?? ""}
+        statuses={itemsDialog?.statuses}
+      />
     </div>
   );
 }

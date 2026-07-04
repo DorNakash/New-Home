@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ExternalLink, Pencil, ImageOff, Zap } from "lucide-react";
+import { ExternalLink, Pencil, ImageOff, Zap, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Currency } from "./Currency";
@@ -8,7 +8,7 @@ import { PriorityStars } from "./PriorityStars";
 import { imgSrc } from "@/lib/utils/image";
 import type { Item } from "@/lib/queries/rooms";
 
-export function ItemCard({ item, onEdit }: { item: Item; onEdit: () => void }) {
+export function ItemCard({ item, onEdit, isFetchingImage }: { item: Item; onEdit: () => void; isFetchingImage?: boolean }) {
   const navigate = useNavigate();
   const price = Number(item.actual_price ?? item.planned_price ?? 0);
 
@@ -18,7 +18,9 @@ export function ItemCard({ item, onEdit }: { item: Item; onEdit: () => void }) {
       onClick={() => navigate(`/items/${item.id}`)}
     >
       <div className="relative flex h-36 items-center justify-center bg-muted">
-        {item.image_path ? (
+        {isFetchingImage ? (
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/40" />
+        ) : item.image_path ? (
           <img
             src={imgSrc(item.image_path)!}
             alt={item.name}

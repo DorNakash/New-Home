@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowRight, PackageOpen, Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,11 +9,37 @@ import { ItemFormDialog } from "@/components/items/ItemFormDialog";
 import { RoomFormDialog } from "@/components/rooms/RoomFormDialog";
 import { FilterBar, applyFilters, EMPTY_FILTERS, type Filters } from "@/components/rooms/FilterBar";
 import { useRoom, useDeleteRoom, type Item } from "@/lib/queries/rooms";
+import { useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
 export function RoomPage() {
   const { roomId } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: room, isLoading } = useRoom(roomId);
+
+  // Auto-fetch images for all items in this room that have a product URL but no image
+  const autoFetchedRoom = useRef<string | null>(null);
+  const [fetchingImageIds, setFetchingImageIds] = useState<Set<string>>(new Set());
+
+  function triggerFetchImage(itemId: string, currentRoomId: string) {
+    setFetchingImageIds(prev => new Set(prev).add(itemId));
+    api(`/api/items/${itemId}/fetch-image`, { method: "POST", body: JSON.stringify({}) })
+      .catch(() => null)
+      .then(() => {
+        setFetchingImageIds(prev => { const next = new Set(prev); next.delete(itemId); return next; });
+        queryClient.invalidateQueries({ queryKey: ["room", currentRoomId] });
+      });
+  }
+
+  useEffect(() => {
+    if (!room || autoFetchedRoom.current === room.id) return;
+    autoFetchedRoom.current = room.id;
+    // Fetch for items with product_url but no image yet
+    room.items
+      .filter((item: Item) => item.product_url && !item.image_path)
+      .forEach((item: Item) => triggerFetchImage(item.id, room.id));
+  }, [room?.id]);
   const deleteRoom = useDeleteRoom();
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -110,7 +136,7 @@ export function RoomPage() {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((item) => (
-              <ItemCard key={item.id} item={item} onEdit={() => openEdit(item)} />
+              <ItemCard key={item.id} item={item} onEdit={() => openEdit(item)} isFetchingImage={fetchingImageIds.has(item.id)} />
             ))}
           </div>
         );

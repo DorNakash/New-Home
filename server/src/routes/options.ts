@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { queryOne, transaction } from "../db/index.js";
 import { requireAuth } from "../auth/middleware.js";
-import { saveImage } from "../storage.js";
+import { saveImage, downloadImage, fetchOgImage } from "../storage.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -80,15 +80,9 @@ router.post("/options/:id/fetch-image", async (req, res) => {
   const directUrl = typeof req.body?.imageUrl === "string" ? req.body.imageUrl.trim() : null;
   if (directUrl) {
     try {
-      const imgRes = await fetch(directUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          "Referer": option.product_url ?? directUrl,
-        },
-        signal: AbortSignal.timeout(7000),
-      });
-      if (!imgRes.ok) return res.status(422).json({ error: `לא ניתן להוריד את התמונה (${imgRes.status})` });
-      const buffer = Buffer.from(await imgRes.arrayBuffer());
+      const referer = option.product_url ?? new URL(directUrl).origin + "/";
+      const buffer = await downloadImage(directUrl, referer);
+      if (!buffer) return res.status(422).json({ error: "לא ניתן להוריד את התמונה" });
       const ext = directUrl.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i)?.[1] ?? "jpg";
       const path = await saveImage({ buffer, originalname: `img.${ext}` }, req.user!.householdId, option.item_id);
       const updated = await queryOne(
@@ -104,44 +98,26 @@ router.post("/options/:id/fetch-image", async (req, res) => {
   if (!option.product_url) return res.status(400).json({ error: "אין קישור למוצר" });
 
   try {
-    const browserHeaders = {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-      "Accept-Language": "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7",
-      "Cache-Control": "no-cache",
-    };
+    const imageUrl = await fetchOgImage(option.product_url);
+    if (!imageUrl) return res.status(422).json({ error: "לא נמצאה תמונה בדף המוצר" });
 
-    const pageRes = await fetch(option.product_url, { headers: browserHeaders, signal: AbortSignal.timeout(7000) });
-    if (!pageRes.ok) return res.status(502).json({ error: `שגיאה בגישה לדף (${pageRes.status})` });
-    const html = await pageRes.text();
-
-    const patterns = [
-      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
-      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
-    ];
-    let rawUrl: string | undefined;
-    for (const re of patterns) { rawUrl = html.match(re)?.[1]; if (rawUrl) break; }
-    if (!rawUrl) return res.status(422).json({ error: "לא נמצאה תמונה בדף המוצר" });
-
-    const base = new URL(option.product_url);
-    const imageUrl = rawUrl.startsWith("//")
-      ? `${base.protocol}${rawUrl}`
-      : rawUrl.startsWith("http") ? rawUrl : new URL(rawUrl, base).toString();
-
-    const imgRes = await fetch(imageUrl, { headers: browserHeaders, signal: AbortSignal.timeout(7000) });
-    if (!imgRes.ok) return res.status(422).json({ error: "לא ניתן להוריד את התמונה" });
-
-    const buffer = Buffer.from(await imgRes.arrayBuffer());
-    const ext = imageUrl.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i)?.[1] ?? "jpg";
-    const path = await saveImage({ buffer, originalname: `og.${ext}` }, req.user!.householdId, option.item_id);
-    const updated = await queryOne("UPDATE item_options SET image_path = $1 WHERE id = $2 RETURNING *", [path, req.params.id]);
+    let storedPath: string = imageUrl;
+    const buffer = await downloadImage(imageUrl, option.product_url);
+    if (buffer) {
+      try {
+        const ext = imageUrl.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i)?.[1] ?? "jpg";
+        storedPath = await saveImage({ buffer, originalname: `og.${ext}` }, req.user!.householdId, option.item_id);
+      } catch (e) {
+        console.error("[fetch-image option] saveImage failed, storing URL directly:", String(e));
+      }
+    }
+    const updated = await queryOne("UPDATE item_options SET image_path = $1 WHERE id = $2 RETURNING *", [storedPath, req.params.id]);
     res.json(updated);
   } catch (err) {
+    console.error("[fetch-image option]", err);
     const msg = err instanceof Error ? err.message : "";
     if (msg.includes("abort") || msg.includes("timeout")) return res.status(504).json({ error: "הדף לא הגיב בזמן" });
-    res.status(502).json({ error: "לא ניתן לגשת לדף המוצר" });
+    res.status(502).json({ error: String(err) });
   }
 });
 
