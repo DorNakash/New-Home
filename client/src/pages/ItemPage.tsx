@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowRight, Plus, ExternalLink, ImageOff, Pencil, Trash2, ImageDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,15 @@ export function ItemPage() {
   const deleteItem = useDeleteItem(item?.room_id ?? "");
   const updateItem = useUpdateItem(item?.room_id ?? "");
   const fetchImage = useFetchItemImage(itemId ?? "", item?.room_id ?? "");
+
+  // Auto-fetch image when item has a product URL but no image yet
+  const autoFetched = useRef(false);
+  useEffect(() => {
+    if (item?.product_url && !item.image_path && !fetchImage.isPending && !autoFetched.current) {
+      autoFetched.current = true;
+      fetchImage.mutate(undefined);
+    }
+  }, [item?.id]);
 
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
