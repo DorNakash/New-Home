@@ -143,8 +143,8 @@ export function ItemFormDialog({
       }
 
       onOpenChange(false);
-    } catch {
-      setError("שמירת הפריט נכשלה, נסו שוב");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "שמירת הפריט נכשלה, נסו שוב");
     }
   }
 

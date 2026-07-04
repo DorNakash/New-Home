@@ -173,6 +173,9 @@ export async function uploadItemImage(file: File, itemId: string): Promise<{ pat
     credentials: "include",
     body: formData,
   });
-  if (!res.ok) throw new Error("העלאת התמונה נכשלה");
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || "העלאת התמונה נכשלה");
+  }
   return res.json();
 }
