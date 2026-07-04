@@ -20,15 +20,19 @@ export function RoomPage() {
 
   // Auto-fetch images for all items in this room that have a product URL but no image
   const autoFetchedRoom = useRef<string | null>(null);
+  const [fetchingImageIds, setFetchingImageIds] = useState<Set<string>>(new Set());
   useEffect(() => {
     if (!room || autoFetchedRoom.current === room.id) return;
     autoFetchedRoom.current = room.id;
     const missing = room.items.filter((item: Item) => item.product_url && !item.image_path);
     if (missing.length === 0) return;
+    setFetchingImageIds(new Set(missing.map((i: Item) => i.id)));
     missing.forEach((item: Item) => {
       api(`/api/items/${item.id}/fetch-image`, { method: "POST", body: JSON.stringify({}) })
-        .then(() => queryClient.invalidateQueries({ queryKey: ["room", room.id] }))
-        .catch(() => {});
+        .finally(() => {
+          setFetchingImageIds(prev => { const next = new Set(prev); next.delete(item.id); return next; });
+          queryClient.invalidateQueries({ queryKey: ["room", room.id] });
+        });
     });
   }, [room?.id]);
   const deleteRoom = useDeleteRoom();
@@ -127,7 +131,7 @@ export function RoomPage() {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((item) => (
-              <ItemCard key={item.id} item={item} onEdit={() => openEdit(item)} />
+              <ItemCard key={item.id} item={item} onEdit={() => openEdit(item)} isFetchingImage={fetchingImageIds.has(item.id)} />
             ))}
           </div>
         );
