@@ -63,16 +63,23 @@ function extractOgImage(html: string, productUrl: string): string | null {
     }
   }
 
-  // Magento-specific: images in x-magento-init or x-magento-cache-key JSON blobs
+  // Magento-specific: images in x-magento-init JSON blobs
+  // Magento 2 PHP-encodes JSON with escaped slashes: "https:\/\/..."
   if (!rawUrl) {
-    const jsonImgMatch = html.match(/"(?:full|img|src|url)"\s*:\s*"(https:\/\/[^"]+\.(?:jpe?g|png|webp|gif|avif))"/i);
-    if (jsonImgMatch) rawUrl = jsonImgMatch[1];
+    const jsonImgMatch = html.match(/"(?:full|img|src|url|image)"\s*:\s*"(https?:(?:\\\/|\/)[^"\\]+\.(?:jpe?g|png|webp|gif|avif))"/i);
+    if (jsonImgMatch) rawUrl = jsonImgMatch[1].replace(/\\\//g, "/");
   }
 
   // Lazy-load fallback: data-src / data-lazy on img tags
   if (!rawUrl) {
-    const lazyMatch = html.match(/<img[^>]+data-(?:src|lazy)=["'](https:\/\/[^"']+\.(?:jpe?g|png|webp|gif|avif))[^"']*["']/i);
+    const lazyMatch = html.match(/data-(?:src|lazy|original)=["'](https?:\/\/[^"']+\.(?:jpe?g|png|webp|gif|avif))[^"']*["']/i);
     if (lazyMatch) rawUrl = lazyMatch[1];
+  }
+
+  // Any absolute image URL containing known CDN patterns (media/catalog, pub/media)
+  if (!rawUrl) {
+    const cdnMatch = html.match(/(https?:(?:\\\/|\/)[^"'\s]+\/(?:pub\/media|media\/catalog|uploads)[^"'\s]+\.(?:jpe?g|png|webp))/i);
+    if (cdnMatch) rawUrl = cdnMatch[1].replace(/\\\//g, "/");
   }
 
   if (!rawUrl) return null;
