@@ -63,6 +63,18 @@ function extractOgImage(html: string, productUrl: string): string | null {
     }
   }
 
+  // Magento-specific: images in x-magento-init or x-magento-cache-key JSON blobs
+  if (!rawUrl) {
+    const jsonImgMatch = html.match(/"(?:full|img|src|url)"\s*:\s*"(https:\/\/[^"]+\.(?:jpe?g|png|webp|gif|avif))"/i);
+    if (jsonImgMatch) rawUrl = jsonImgMatch[1];
+  }
+
+  // Lazy-load fallback: data-src / data-lazy on img tags
+  if (!rawUrl) {
+    const lazyMatch = html.match(/<img[^>]+data-(?:src|lazy)=["'](https:\/\/[^"']+\.(?:jpe?g|png|webp|gif|avif))[^"']*["']/i);
+    if (lazyMatch) rawUrl = lazyMatch[1];
+  }
+
   if (!rawUrl) return null;
   const base = new URL(productUrl);
   return rawUrl.startsWith("//") ? `${base.protocol}${rawUrl}`
