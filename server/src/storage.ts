@@ -88,41 +88,89 @@ function extractOgImage(html: string, productUrl: string): string | null {
     : new URL(rawUrl, base).toString();
 }
 
+async function attempt(name: string, fn: () => Promise<string | null>): Promise<string | null> {
+  try {
+    const r = await fn();
+    console.log(`[og:${name}]`, r ? r.substring(0, 70) : "null");
+    return r;
+  } catch (e) {
+    console.log(`[og:${name}] err:`, String(e).substring(0, 70));
+    return null;
+  }
+}
+
 export async function fetchOgImage(productUrl: string): Promise<string | null> {
   console.log("[fetchOgImage] START:", productUrl.substring(0, 100));
-
   const toImg = (html: string) => extractOgImage(html, productUrl);
 
-  // All strategies fire simultaneously; first to return a non-null image URL wins.
-  // Promise.any resolves on first fulfillment, ignoring rejections.
-  const strategies: Promise<string | null>[] = [
+  const strategies = [
 
-    // 1. Direct fetch — instant fail on blocked sites (0.1s 403), near-instant on allowed ones
-    fetch(productUrl, { headers: PAGE_HEADERS, signal: AbortSignal.timeout(3000) })
-      .then(r => r.ok ? r.text().then(toImg) : null).catch(() => null),
+    // 1. Direct — instant 403 on blocked sites so it fails fast and doesn't hold up Promise.any
+    attempt("direct", async () => {
+      const r = await fetch(productUrl, { headers: PAGE_HEADERS, signal: AbortSignal.timeout(3000) });
+      return r.ok ? toImg(await r.text()) : null;
+    }),
 
-    // 2. jsonlink.io — link preview SaaS; extracts og:image server-side without our HTML parsing
-    fetch(`https://jsonlink.io/api/extract?url=${encodeURIComponent(productUrl)}`, {
-      signal: AbortSignal.timeout(6000),
-    }).then(r => r.ok ? r.json().then((d: { image?: string }) => d?.image ?? null) : null).catch(() => null),
+    // 2. jsonlink.io — dedicated link preview SaaS, returns og:image without HTML parsing
+    attempt("jsonlink", async () => {
+      const r = await fetch(`https://jsonlink.io/api/extract?url=${encodeURIComponent(productUrl)}`, {
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!r.ok) return null;
+      const d = await r.json() as { image?: string };
+      return d.image ?? null;
+    }),
 
-    // 3. allorigins.win — Cloudflare Workers proxy (different IP space than datacenter)
-    fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(productUrl)}`, {
-      signal: AbortSignal.timeout(8000),
-    }).then(r => r.ok ? r.json().then((d: { contents?: string; status?: { http_code: number } }) =>
-      d?.status?.http_code === 200 && d.contents ? toImg(d.contents) : null) : null).catch(() => null),
+    // 3. Wayback Machine — archive.org serves cached HTML, bypasses site firewall entirely
+    attempt("wayback", async () => {
+      const r = await fetch(`https://web.archive.org/web/${productUrl}`, {
+        signal: AbortSignal.timeout(8000),
+      });
+      return r.ok ? toImg(await r.text()) : null;
+    }),
 
-    // 4. corsproxy.io — independent proxy infrastructure
-    fetch(`https://corsproxy.io/?${encodeURIComponent(productUrl)}`, {
-      signal: AbortSignal.timeout(8000),
-    }).then(r => r.ok ? r.text().then(toImg) : null).catch(() => null),
+    // 4. Magento REST API — often has different WAF rules than the HTML frontend
+    attempt("magento-api", async () => {
+      const { pathname, origin } = new URL(productUrl);
+      const urlKey = pathname.split("/").filter(Boolean).pop()?.replace(/\.html?$/i, "");
+      if (!urlKey) return null;
+      const apiUrl = `${origin}/rest/default/V1/products?searchCriteria[pageSize]=1` +
+        `&searchCriteria[filterGroups][0][filters][0][field]=url_key` +
+        `&searchCriteria[filterGroups][0][filters][0][value]=${encodeURIComponent(urlKey)}`;
+      const r = await fetch(apiUrl, {
+        headers: { Accept: "application/json", "User-Agent": PAGE_HEADERS["User-Agent"] },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!r.ok) return null;
+      const data = await r.json() as { items?: Array<{ media_gallery_entries?: Array<{ file?: string }> }> };
+      const file = data.items?.[0]?.media_gallery_entries?.[0]?.file;
+      return file ? `${origin}/pub/media/catalog/product${file}` : null;
+    }),
+
+    // 5. allorigins.win — Cloudflare Workers proxy
+    attempt("allorigins", async () => {
+      const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(productUrl)}`, {
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!r.ok) return null;
+      const d = await r.json() as { contents?: string; status?: { http_code: number } };
+      return d?.status?.http_code === 200 && d.contents ? toImg(d.contents) : null;
+    }),
+
+    // 6. corsproxy.io — independent proxy
+    attempt("corsproxy", async () => {
+      const r = await fetch(`https://corsproxy.io/?${encodeURIComponent(productUrl)}`, {
+        signal: AbortSignal.timeout(8000),
+      });
+      return r.ok ? toImg(await r.text()) : null;
+    }),
   ];
 
   const result = await Promise.any(
     strategies.map(p => p.then(v => (v !== null ? v : Promise.reject(new Error("no-image")))))
   ).catch(() => null) as string | null;
 
-  console.log("[fetchOgImage] result:", result ? result.substring(0, 80) : "null");
+  console.log("[fetchOgImage] RESULT:", result ? result.substring(0, 80) : "null");
   return result;
 }
 
