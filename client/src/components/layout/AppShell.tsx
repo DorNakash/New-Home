@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, ScrollRestoration } from "react-router-dom";
 import { Home, LogOut, Store } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { SearchBar } from "./SearchBar";
@@ -42,6 +42,7 @@ export function AppShell() {
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-8">
+        <ScrollRestoration />
         <Outlet />
       </main>
     </div>
