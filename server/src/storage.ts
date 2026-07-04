@@ -126,7 +126,12 @@ export async function fetchOgImage(productUrl: string): Promise<string | null> {
       const r = await fetch(`https://web.archive.org/web/${productUrl}`, {
         signal: AbortSignal.timeout(8000),
       });
-      return r.ok ? toImg(await r.text()) : null;
+      if (!r.ok) return null;
+      const waybUrl = toImg(await r.text());
+      if (!waybUrl) return null;
+      // Strip archive.org wrapper to get the original CDN URL
+      const original = waybUrl.replace(/^https?:\/\/web\.archive\.org\/web\/\d+(?:im_)?\//, "");
+      return original.startsWith("http") ? original : waybUrl;
     }),
 
     // 4. Magento REST API — often has different WAF rules than the HTML frontend
@@ -192,7 +197,7 @@ export async function downloadImage(imageUrl: string, referer: string): Promise<
 
   // Run direct download and proxy in parallel — take whichever succeeds first
   const [directResult, proxyResult] = await Promise.allSettled([
-    fetch(fetchUrl, { headers: { ...IMAGE_HEADERS, "Referer": referer }, signal: AbortSignal.timeout(3000) })
+    fetch(fetchUrl, { headers: { ...IMAGE_HEADERS, "Referer": referer }, signal: AbortSignal.timeout(4000) })
       .then(async r => {
         if (!r.ok) return null;
         const ct = r.headers.get("content-type") ?? "";
@@ -201,7 +206,7 @@ export async function downloadImage(imageUrl: string, referer: string): Promise<
 
     fetch(`https://images.weserv.nl/?url=${encodeURIComponent(proxyTarget)}`, {
       headers: IMAGE_HEADERS,
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(4000),
     }).then(r => r.ok ? r.arrayBuffer().then(buf => Buffer.from(buf)) : null).catch(() => null),
   ]);
 
