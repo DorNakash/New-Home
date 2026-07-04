@@ -2,10 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 
-// /var/task is read-only on Vercel; fall back to /tmp (ephemeral but writable) when Blob not configured
-export const UPLOADS_ROOT = process.env.VERCEL
-  ? "/tmp/uploads"
-  : path.join(process.cwd(), "uploads");
+export const UPLOADS_ROOT = path.join(process.cwd(), "uploads");
 
 export async function saveImage(
   file: { buffer: Buffer; originalname: string },
@@ -19,6 +16,13 @@ export async function saveImage(
     const { put } = await import("@vercel/blob");
     const { url } = await put(blobPath, file.buffer, { access: "public" });
     return url;
+  }
+
+  // On Vercel without Blob: /tmp is ephemeral (cleared between invocations), so a relative
+  // path stored in the DB would 404 on the next request. Throw so the caller stores the
+  // original CDN URL directly instead.
+  if (process.env.VERCEL) {
+    throw new Error("BLOB_READ_WRITE_TOKEN not configured — cannot persist image on Vercel");
   }
 
   const dir = path.join(UPLOADS_ROOT, householdId, itemId);
@@ -124,17 +128,29 @@ export async function fetchOgImage(productUrl: string): Promise<string | null> {
       return d.image ?? null;
     }),
 
-    // 3. Wayback Machine — archive.org serves cached HTML, bypasses site firewall entirely
+    // 3. Wayback Machine (archive.org) — serves cached HTML, bypasses site firewall
     attempt("wayback", async () => {
       const r = await fetch(`https://web.archive.org/web/${productUrl}`, {
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(7000),
       });
       if (!r.ok) return null;
       const waybUrl = toImg(await r.text());
       if (!waybUrl) return null;
-      // Strip archive.org wrapper to get the original CDN URL
       const original = waybUrl.replace(/^https?:\/\/web\.archive\.org\/web\/\d+(?:im_)?\//, "");
       return original.startsWith("http") ? original : waybUrl;
+    }),
+
+    // 4b. archive.ph — independent archive, indexes different/more recent pages than archive.org
+    attempt("archive.ph", async () => {
+      const r = await fetch(`https://archive.ph/newest/${productUrl}`, {
+        signal: AbortSignal.timeout(7000),
+      });
+      if (!r.ok) return null;
+      const archUrl = toImg(await r.text());
+      if (!archUrl) return null;
+      // Strip archive.ph wrapper: https://archive.ph/HASH/URL → URL
+      const original = archUrl.replace(/^https?:\/\/archive\.ph\/[^/]+\//, "");
+      return original.startsWith("http") ? original : archUrl;
     }),
 
     // 4. Magento REST API — often has different WAF rules than the HTML frontend
