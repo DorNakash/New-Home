@@ -41,6 +41,7 @@ export interface ItemDetail {
 
 export interface SearchItem {
   id: string;
+  room_id: string;
   name: string;
   room_name: string;
   category_name: string | null;
@@ -67,6 +68,16 @@ export function useSearchItems(params: {
     queryKey: ["items-search", params],
     queryFn: () => api<SearchItem[]>(`/api/items?${qs}`),
     enabled,
+  });
+}
+
+export function useDashboardItems(params: { statuses?: string[]; enabled?: boolean }) {
+  const qs = new URLSearchParams();
+  if (params.statuses?.length) qs.set("status", params.statuses.join(","));
+  return useQuery<SearchItem[]>({
+    queryKey: ["dashboard-items", params.statuses ?? "all"],
+    queryFn: () => api<SearchItem[]>(`/api/items?${qs}`),
+    enabled: params.enabled !== false,
   });
 }
 

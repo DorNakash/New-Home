@@ -41,7 +41,14 @@ router.get("/", async (req, res) => {
   let idx = 2;
 
   if (q) { conditions.push(`i.name ILIKE $${idx++}`); values.push(`%${q}%`); }
-  if (status) { conditions.push(`i.status = $${idx++}`); values.push(status); }
+  if (status) {
+    const statuses = status.split(",").map((s: string) => s.trim()).filter(Boolean);
+    if (statuses.length === 1) {
+      conditions.push(`i.status = $${idx++}`); values.push(statuses[0]);
+    } else {
+      conditions.push(`i.status = ANY($${idx++}::text[])`); values.push(statuses);
+    }
+  }
   if (room_id) { conditions.push(`i.room_id = $${idx++}`); values.push(room_id); }
   if (category_id) { conditions.push(`i.category_id = $${idx++}`); values.push(category_id); }
   if (priority) { conditions.push(`i.priority = $${idx++}`); values.push(priority); }
