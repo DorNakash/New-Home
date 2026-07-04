@@ -8,7 +8,7 @@ import { PriorityStars } from "./PriorityStars";
 import { imgSrc } from "@/lib/utils/image";
 import type { Item } from "@/lib/queries/rooms";
 
-export function ItemCard({ item, onEdit, isFetchingImage, onImageError }: { item: Item; onEdit: () => void; isFetchingImage?: boolean; onImageError?: () => void }) {
+export function ItemCard({ item, onEdit, isFetchingImage }: { item: Item; onEdit: () => void; isFetchingImage?: boolean }) {
   const navigate = useNavigate();
   const price = Number(item.actual_price ?? item.planned_price ?? 0);
 
@@ -18,15 +18,14 @@ export function ItemCard({ item, onEdit, isFetchingImage, onImageError }: { item
       onClick={() => navigate(`/items/${item.id}`)}
     >
       <div className="relative flex h-36 items-center justify-center bg-muted">
-        {item.image_path && !isFetchingImage ? (
+        {isFetchingImage ? (
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/40" />
+        ) : item.image_path ? (
           <img
             src={imgSrc(item.image_path)!}
             alt={item.name}
             className="h-full w-full object-contain p-2"
-            onError={onImageError}
           />
-        ) : isFetchingImage ? (
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/40" />
         ) : (
           <ImageOff className="h-8 w-8 text-muted-foreground/40" />
         )}

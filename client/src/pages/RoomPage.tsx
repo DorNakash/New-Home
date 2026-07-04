@@ -136,7 +136,7 @@ export function RoomPage() {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((item) => (
-              <ItemCard key={item.id} item={item} onEdit={() => openEdit(item)} isFetchingImage={fetchingImageIds.has(item.id)} onImageError={item.product_url ? () => triggerFetchImage(item.id, room!.id) : undefined} />
+              <ItemCard key={item.id} item={item} onEdit={() => openEdit(item)} isFetchingImage={fetchingImageIds.has(item.id)} />
             ))}
           </div>
         );
