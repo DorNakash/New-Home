@@ -180,36 +180,32 @@ const IMAGE_HEADERS = {
 };
 
 export async function downloadImage(imageUrl: string, referer: string): Promise<Buffer | null> {
-  // Wayback Machine: use im_ flag so archive.org serves the raw image, not the HTML toolbar wrapper
+  // Wayback Machine: use im_ flag so archive.org serves raw image bytes, not the HTML toolbar
   const fetchUrl = imageUrl.replace(
     /^(https:\/\/web\.archive\.org\/web\/)(\d+)(\/)/,
     "$1$2im_$3"
   );
 
-  try {
-    const direct = await fetch(fetchUrl, {
-      headers: { ...IMAGE_HEADERS, "Referer": referer },
-      signal: AbortSignal.timeout(4000),
-    });
-    if (direct.ok) {
-      const ct = direct.headers.get("content-type") ?? "";
-      if (ct.startsWith("image/")) return Buffer.from(await direct.arrayBuffer());
-    }
-  } catch { /* blocked or dropped */ }
-
-  // Extract original CDN URL from Wayback wrapper and proxy it via images.weserv.nl
-  const originalUrl = imageUrl.replace(
-    /^https:\/\/web\.archive\.org\/web\/\d+(?:im_)?\//, ""
-  );
+  // Extract original CDN URL from Wayback wrapper for the proxy attempt
+  const originalUrl = imageUrl.replace(/^https:\/\/web\.archive\.org\/web\/\d+(?:im_)?\//, "");
   const proxyTarget = originalUrl.startsWith("http") ? originalUrl : imageUrl;
 
-  try {
-    const proxy = await fetch(`https://images.weserv.nl/?url=${encodeURIComponent(proxyTarget)}`, {
-      headers: IMAGE_HEADERS,
-      signal: AbortSignal.timeout(4000),
-    });
-    if (proxy.ok) return Buffer.from(await proxy.arrayBuffer());
-  } catch { /* proxy failed */ }
+  // Run direct download and proxy in parallel — take whichever succeeds first
+  const [directResult, proxyResult] = await Promise.allSettled([
+    fetch(fetchUrl, { headers: { ...IMAGE_HEADERS, "Referer": referer }, signal: AbortSignal.timeout(3000) })
+      .then(async r => {
+        if (!r.ok) return null;
+        const ct = r.headers.get("content-type") ?? "";
+        return ct.startsWith("image/") ? Buffer.from(await r.arrayBuffer()) : null;
+      }).catch(() => null),
 
-  return null;
+    fetch(`https://images.weserv.nl/?url=${encodeURIComponent(proxyTarget)}`, {
+      headers: IMAGE_HEADERS,
+      signal: AbortSignal.timeout(3000),
+    }).then(r => r.ok ? r.arrayBuffer().then(buf => Buffer.from(buf)) : null).catch(() => null),
+  ]);
+
+  const direct = directResult.status === "fulfilled" ? directResult.value : null;
+  const proxy = proxyResult.status === "fulfilled" ? proxyResult.value : null;
+  return direct ?? proxy;
 }
