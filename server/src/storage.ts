@@ -123,6 +123,27 @@ export async function fetchOgImage(productUrl: string): Promise<string | null> {
     console.log("[fetchOgImage] direct catch:", String(e));
   }
 
+  // HTML proxy via allorigins.win — Cloudflare-backed, bypasses datacenter IP blocks (403s from Israeli retail sites)
+  try {
+    console.log("[fetchOgImage] calling allorigins proxy...");
+    const proxy = await fetch(
+      `https://api.allorigins.win/get?url=${encodeURIComponent(productUrl)}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    console.log("[fetchOgImage] allorigins status:", proxy.status);
+    if (proxy.ok) {
+      const data = await proxy.json() as { contents?: string; status?: { http_code: number } };
+      console.log("[fetchOgImage] allorigins http_code:", data.status?.http_code, "| contents length:", data.contents?.length ?? 0);
+      if (data.status?.http_code === 200 && data.contents) {
+        const img = extractOgImage(data.contents, productUrl);
+        console.log("[fetchOgImage] allorigins extracted img:", img ?? "none");
+        if (img) return img;
+      }
+    }
+  } catch (e) {
+    console.log("[fetchOgImage] allorigins catch:", String(e));
+  }
+
   console.log("[fetchOgImage] DONE returning null");
   return null;
 }
