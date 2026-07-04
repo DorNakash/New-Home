@@ -11,12 +11,22 @@ export interface OptionInput {
   cons?: string | null;
 }
 
+function autoFetchOptionImage(optionId: string, option: { product_url?: string | null; image_path?: string | null }, invalidate: () => void) {
+  if (!option.product_url || option.image_path) return;
+  api(`/api/options/${optionId}/fetch-image`, { method: "POST", body: JSON.stringify({}) })
+    .then(invalidate)
+    .catch(() => {});
+}
+
 export function useCreateOption(itemId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: OptionInput) =>
-      api(`/api/items/${itemId}/options`, { method: "POST", body: JSON.stringify(input) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["item", itemId] }),
+      api<{ id: string; product_url: string | null; image_path: string | null }>(`/api/items/${itemId}/options`, { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["item", itemId] });
+      autoFetchOptionImage(data.id, data, () => queryClient.invalidateQueries({ queryKey: ["item", itemId] }));
+    },
   });
 }
 
@@ -24,8 +34,13 @@ export function useUpdateOption(itemId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...input }: OptionInput & { id: string }) =>
-      api(`/api/options/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["item", itemId] }),
+      api<{ id: string; product_url: string | null; image_path: string | null }>(`/api/options/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["item", itemId] });
+      if ("product_url" in variables) {
+        autoFetchOptionImage(data.id, data, () => queryClient.invalidateQueries({ queryKey: ["item", itemId] }));
+      }
+    },
   });
 }
 
