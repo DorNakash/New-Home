@@ -180,18 +180,33 @@ const IMAGE_HEADERS = {
 };
 
 export async function downloadImage(imageUrl: string, referer: string): Promise<Buffer | null> {
-  try {
-    const direct = await fetch(imageUrl, {
-      headers: { ...IMAGE_HEADERS, "Referer": referer },
-      signal: AbortSignal.timeout(2000),
-    });
-    if (direct.ok) return Buffer.from(await direct.arrayBuffer());
-  } catch { /* blocked or dropped */ }
+  // Wayback Machine: use im_ flag so archive.org serves the raw image, not the HTML toolbar wrapper
+  const fetchUrl = imageUrl.replace(
+    /^(https:\/\/web\.archive\.org\/web\/)(\d+)(\/)/,
+    "$1$2im_$3"
+  );
 
   try {
-    const proxy = await fetch(`https://images.weserv.nl/?url=${encodeURIComponent(imageUrl)}`, {
+    const direct = await fetch(fetchUrl, {
+      headers: { ...IMAGE_HEADERS, "Referer": referer },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (direct.ok) {
+      const ct = direct.headers.get("content-type") ?? "";
+      if (ct.startsWith("image/")) return Buffer.from(await direct.arrayBuffer());
+    }
+  } catch { /* blocked or dropped */ }
+
+  // Extract original CDN URL from Wayback wrapper and proxy it via images.weserv.nl
+  const originalUrl = imageUrl.replace(
+    /^https:\/\/web\.archive\.org\/web\/\d+(?:im_)?\//, ""
+  );
+  const proxyTarget = originalUrl.startsWith("http") ? originalUrl : imageUrl;
+
+  try {
+    const proxy = await fetch(`https://images.weserv.nl/?url=${encodeURIComponent(proxyTarget)}`, {
       headers: IMAGE_HEADERS,
-      signal: AbortSignal.timeout(2000),
+      signal: AbortSignal.timeout(4000),
     });
     if (proxy.ok) return Buffer.from(await proxy.arrayBuffer());
   } catch { /* proxy failed */ }
