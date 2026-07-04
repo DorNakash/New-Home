@@ -39,13 +39,30 @@ const PAGE_HEADERS = {
 
 function extractOgImage(html: string, productUrl: string): string | null {
   const patterns = [
-    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
-    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+    /<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::secure_url)?["']/i,
     /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
     /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
   ];
   let rawUrl: string | undefined;
   for (const re of patterns) { rawUrl = html.match(re)?.[1]; if (rawUrl) break; }
+
+  // JSON-LD fallback — Magento/WooCommerce embed product images in structured data
+  if (!rawUrl) {
+    const ldMatch = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+    if (ldMatch) {
+      for (const tag of ldMatch) {
+        try {
+          const inner = tag.replace(/<script[^>]*>/, "").replace(/<\/script>/, "");
+          const json = JSON.parse(inner);
+          const imgs = [json?.image, json?.image?.[0]].flat().filter(Boolean);
+          const url = imgs.find((u: unknown) => typeof u === "string" && u.startsWith("http")) as string | undefined;
+          if (url) { rawUrl = url; break; }
+        } catch { /* malformed JSON-LD */ }
+      }
+    }
+  }
+
   if (!rawUrl) return null;
   const base = new URL(productUrl);
   return rawUrl.startsWith("//") ? `${base.protocol}${rawUrl}`
@@ -57,8 +74,8 @@ export async function fetchOgImage(productUrl: string): Promise<string | null> {
   try {
     // Microlink handles anti-bot, Cloudflare, and geo-blocked Israeli sites
     const ml = await fetch(
-      `https://api.microlink.io/?url=${encodeURIComponent(productUrl)}`,
-      { signal: AbortSignal.timeout(6000) }
+      `https://api.microlink.io/?url=${encodeURIComponent(productUrl)}&javascript=true`,
+      { signal: AbortSignal.timeout(8000) }
     ).catch(() => null);
     if (ml?.ok) {
       const body = await ml.json().catch(() => null) as { status: string; data?: { image?: { url?: string } } } | null;
