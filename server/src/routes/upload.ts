@@ -17,8 +17,16 @@ router.post("/", upload.single("file"), async (req, res) => {
     return res.status(400).json({ error: "יש לצרף קובץ ומזהה פריט" });
   }
 
-  const relativePath = await saveImage(req.file, req.user!.householdId, itemId);
-  res.status(201).json({ path: relativePath, url: imageUrl(relativePath) });
+  try {
+    const relativePath = await saveImage(req.file, req.user!.householdId, itemId);
+    res.status(201).json({ path: relativePath, url: imageUrl(relativePath) });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("BLOB_READ_WRITE_TOKEN")) {
+      return res.status(503).json({ error: "העלאת קבצים אינה זמינה — נא להשתמש בקישור לתמונה" });
+    }
+    res.status(500).json({ error: "העלאת התמונה נכשלה" });
+  }
 });
 
 export default router;
