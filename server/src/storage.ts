@@ -38,49 +38,48 @@ const PAGE_HEADERS = {
 };
 
 function extractOgImage(html: string, productUrl: string): string | null {
-  const patterns = [
-    /<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i,
-    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::secure_url)?["']/i,
-    /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
-    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
-  ];
+  // Strategy 1: simple string search around og:image (robust against attribute ordering)
   let rawUrl: string | undefined;
-  for (const re of patterns) { rawUrl = html.match(re)?.[1]; if (rawUrl) break; }
-
-  // JSON-LD fallback — Magento/WooCommerce embed product images in structured data
-  if (!rawUrl) {
-    const ldMatch = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
-    if (ldMatch) {
-      for (const tag of ldMatch) {
-        try {
-          const inner = tag.replace(/<script[^>]*>/, "").replace(/<\/script>/, "");
-          const json = JSON.parse(inner);
-          const imgs = [json?.image, json?.image?.[0]].flat().filter(Boolean);
-          const url = imgs.find((u: unknown) => typeof u === "string" && u.startsWith("http")) as string | undefined;
-          if (url) { rawUrl = url; break; }
-        } catch { /* malformed JSON-LD */ }
-      }
+  for (const marker of ["og:image", "twitter:image"]) {
+    const idx = html.indexOf(marker);
+    if (idx !== -1) {
+      const ctx = html.substring(idx, idx + 300);
+      const m = ctx.match(/content=["']([^"']{10,})["']/i);
+      if (m) { rawUrl = m[1]; break; }
     }
   }
 
-  // Magento-specific: images in x-magento-init JSON blobs
-  // Magento 2 PHP-encodes JSON with escaped slashes: "https:\/\/..."
+  // Strategy 2: JSON-LD structured data
   if (!rawUrl) {
-    const jsonImgMatch = html.match(/"(?:full|img|src|url|image)"\s*:\s*"(https?:(?:\\\/|\/)[^"\\]+\.(?:jpe?g|png|webp|gif|avif))"/i);
-    if (jsonImgMatch) rawUrl = jsonImgMatch[1].replace(/\\\//g, "/");
+    const tags = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi) ?? [];
+    for (const tag of tags) {
+      try {
+        const json = JSON.parse(tag.replace(/<script[^>]*>/, "").replace(/<\/script>/, ""));
+        const candidates = [json?.image, json?.image?.[0]].flat().filter((u: unknown) => typeof u === "string" && (u as string).startsWith("http"));
+        if (candidates.length) { rawUrl = candidates[0] as string; break; }
+      } catch { /* skip */ }
+    }
   }
 
-  // Lazy-load fallback: data-src / data-lazy on img tags
+  // Strategy 3: Magento x-magento-init JSON (handles escaped slashes)
   if (!rawUrl) {
-    const lazyMatch = html.match(/data-(?:src|lazy|original)=["'](https?:\/\/[^"']+\.(?:jpe?g|png|webp|gif|avif))[^"']*["']/i);
-    if (lazyMatch) rawUrl = lazyMatch[1];
+    const m = html.match(/"(?:full|img|src|url|image)"\s*:\s*"(https?:[^"]{5,})"/i);
+    if (m) rawUrl = m[1].replace(/\\\//g, "/").split('"')[0];
   }
 
-  // Any absolute image URL containing known CDN patterns (media/catalog, pub/media)
+  // Strategy 4: any pub/media or media/catalog CDN URL anywhere in the page
   if (!rawUrl) {
-    const cdnMatch = html.match(/(https?:(?:\\\/|\/)[^"'\s]+\/(?:pub\/media|media\/catalog|uploads)[^"'\s]+\.(?:jpe?g|png|webp))/i);
-    if (cdnMatch) rawUrl = cdnMatch[1].replace(/\\\//g, "/");
+    const m = html.match(/https?:(?:\\\/|\/)[^"'\s<>]+(?:pub\/media|media\/catalog)[^"'\s<>]+\.(?:jpe?g|png|webp)/i);
+    if (m) rawUrl = m[0].replace(/\\\//g, "/");
   }
+
+  // Strategy 5: data-src / data-lazy on img tags
+  if (!rawUrl) {
+    const m = html.match(/data-(?:src|lazy|original)=["'](https?:\/\/[^"']+\.(?:jpe?g|png|webp|gif))["']/i);
+    if (m) rawUrl = m[1];
+  }
+
+  console.log("[extractOgImage] found:", rawUrl ? rawUrl.substring(0, 80) : "none", "| html length:", html.length);
 
   if (!rawUrl) return null;
   const base = new URL(productUrl);
@@ -90,30 +89,41 @@ function extractOgImage(html: string, productUrl: string): string | null {
 }
 
 export async function fetchOgImage(productUrl: string): Promise<string | null> {
+  console.log("[fetchOgImage] START url:", productUrl.substring(0, 100));
+
   try {
-    // Microlink handles anti-bot and geo-blocked sites
+    console.log("[fetchOgImage] calling microlink...");
     const ml = await fetch(
       `https://api.microlink.io/?url=${encodeURIComponent(productUrl)}`,
       { signal: AbortSignal.timeout(6000) }
-    ).catch(() => null);
+    ).catch((e: unknown) => { console.log("[fetchOgImage] microlink fetch error:", String(e)); return null; });
     if (ml?.ok) {
       const body = await ml.json().catch(() => null) as { status: string; data?: { image?: { url?: string } } } | null;
-      console.log("[fetchOgImage] microlink:", body?.status, body?.data?.image?.url ?? "no image");
+      console.log("[fetchOgImage] microlink response:", body?.status, body?.data?.image?.url ?? "no image");
       if (body?.status === "success" && body.data?.image?.url) return body.data.image.url;
+    } else {
+      console.log("[fetchOgImage] microlink not ok:", ml?.status);
     }
-  } catch { /* Microlink unavailable */ }
+  } catch (e) {
+    console.log("[fetchOgImage] microlink outer catch:", String(e));
+  }
 
   try {
-    // Fallback: fetch HTML directly (works for sites that don't block Vercel IPs)
-    const direct = await fetch(productUrl, { headers: PAGE_HEADERS, signal: AbortSignal.timeout(2000) });
+    console.log("[fetchOgImage] calling direct fetch...");
+    const direct = await fetch(productUrl, { headers: PAGE_HEADERS, signal: AbortSignal.timeout(4000) });
+    console.log("[fetchOgImage] direct status:", direct.status);
     if (direct.ok) {
       const html = await direct.text();
+      console.log("[fetchOgImage] html length:", html.length, "| snippet:", html.substring(0, 200).replace(/\n/g, " "));
       const img = extractOgImage(html, productUrl);
-      console.log("[fetchOgImage] direct html:", img ?? "no image");
+      console.log("[fetchOgImage] extracted img:", img ?? "none");
       if (img) return img;
     }
-  } catch { /* site blocked or timeout */ }
+  } catch (e) {
+    console.log("[fetchOgImage] direct catch:", String(e));
+  }
 
+  console.log("[fetchOgImage] DONE returning null");
   return null;
 }
 
