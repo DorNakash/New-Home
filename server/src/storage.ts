@@ -88,60 +88,69 @@ function extractOgImage(html: string, productUrl: string): string | null {
     : new URL(rawUrl, base).toString();
 }
 
+async function fetchHtml(productUrl: string): Promise<string | null> {
+  // Run direct fetch + two HTML proxies in parallel — take the first one that succeeds
+  async function tryDirect(): Promise<string> {
+    const r = await fetch(productUrl, { headers: PAGE_HEADERS, signal: AbortSignal.timeout(4000) });
+    if (!r.ok) throw new Error(`direct:${r.status}`);
+    return r.text();
+  }
+
+  // allorigins.win — Cloudflare Workers, bypasses Israeli CDN IP blocks
+  async function tryAllOrigins(): Promise<string> {
+    const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(productUrl)}`, {
+      signal: AbortSignal.timeout(7000),
+    });
+    if (!r.ok) throw new Error(`allorigins:${r.status}`);
+    const d = await r.json() as { contents?: string; status?: { http_code: number } };
+    if (d.status?.http_code !== 200 || !d.contents) throw new Error("allorigins:no-content");
+    return d.contents;
+  }
+
+  // api.codetabs.com — independent proxy, different infrastructure
+  async function tryCodeTabs(): Promise<string> {
+    const r = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(productUrl)}`, {
+      signal: AbortSignal.timeout(7000),
+    });
+    if (!r.ok) throw new Error(`codetabs:${r.status}`);
+    return r.text();
+  }
+
+  try {
+    const html = await Promise.any([tryDirect(), tryAllOrigins(), tryCodeTabs()]);
+    console.log("[fetchHtml] success, length:", html.length);
+    return html;
+  } catch (e) {
+    console.log("[fetchHtml] all failed:", String(e));
+    return null;
+  }
+}
+
 export async function fetchOgImage(productUrl: string): Promise<string | null> {
   console.log("[fetchOgImage] START url:", productUrl.substring(0, 100));
 
+  // Try Microlink first — it handles JS-rendered pages and geo-blocks
   try {
-    console.log("[fetchOgImage] calling microlink...");
     const ml = await fetch(
       `https://api.microlink.io/?url=${encodeURIComponent(productUrl)}`,
-      { signal: AbortSignal.timeout(6000) }
+      { signal: AbortSignal.timeout(3000) }
     ).catch((e: unknown) => { console.log("[fetchOgImage] microlink fetch error:", String(e)); return null; });
     if (ml?.ok) {
       const body = await ml.json().catch(() => null) as { status: string; data?: { image?: { url?: string } } } | null;
-      console.log("[fetchOgImage] microlink response:", body?.status, body?.data?.image?.url ?? "no image");
+      console.log("[fetchOgImage] microlink:", body?.status, body?.data?.image?.url ?? "no image");
       if (body?.status === "success" && body.data?.image?.url) return body.data.image.url;
     } else {
       console.log("[fetchOgImage] microlink not ok:", ml?.status);
     }
   } catch (e) {
-    console.log("[fetchOgImage] microlink outer catch:", String(e));
+    console.log("[fetchOgImage] microlink catch:", String(e));
   }
 
-  try {
-    console.log("[fetchOgImage] calling direct fetch...");
-    const direct = await fetch(productUrl, { headers: PAGE_HEADERS, signal: AbortSignal.timeout(4000) });
-    console.log("[fetchOgImage] direct status:", direct.status);
-    if (direct.ok) {
-      const html = await direct.text();
-      console.log("[fetchOgImage] html length:", html.length, "| snippet:", html.substring(0, 200).replace(/\n/g, " "));
-      const img = extractOgImage(html, productUrl);
-      console.log("[fetchOgImage] extracted img:", img ?? "none");
-      if (img) return img;
-    }
-  } catch (e) {
-    console.log("[fetchOgImage] direct catch:", String(e));
-  }
-
-  // HTML proxy via allorigins.win — Cloudflare-backed, bypasses datacenter IP blocks (403s from Israeli retail sites)
-  try {
-    console.log("[fetchOgImage] calling allorigins proxy...");
-    const proxy = await fetch(
-      `https://api.allorigins.win/get?url=${encodeURIComponent(productUrl)}`,
-      { signal: AbortSignal.timeout(5000) }
-    );
-    console.log("[fetchOgImage] allorigins status:", proxy.status);
-    if (proxy.ok) {
-      const data = await proxy.json() as { contents?: string; status?: { http_code: number } };
-      console.log("[fetchOgImage] allorigins http_code:", data.status?.http_code, "| contents length:", data.contents?.length ?? 0);
-      if (data.status?.http_code === 200 && data.contents) {
-        const img = extractOgImage(data.contents, productUrl);
-        console.log("[fetchOgImage] allorigins extracted img:", img ?? "none");
-        if (img) return img;
-      }
-    }
-  } catch (e) {
-    console.log("[fetchOgImage] allorigins catch:", String(e));
+  // Fetch HTML via direct + parallel proxies, parse og:image from whichever responds first
+  const html = await fetchHtml(productUrl);
+  if (html) {
+    const img = extractOgImage(html, productUrl);
+    if (img) return img;
   }
 
   console.log("[fetchOgImage] DONE returning null");
