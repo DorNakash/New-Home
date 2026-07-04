@@ -104,8 +104,12 @@ router.post("/options/:id/fetch-image", async (req, res) => {
     let storedPath: string = imageUrl;
     const buffer = await downloadImage(imageUrl, option.product_url);
     if (buffer) {
-      const ext = imageUrl.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i)?.[1] ?? "jpg";
-      storedPath = await saveImage({ buffer, originalname: `og.${ext}` }, req.user!.householdId, option.item_id);
+      try {
+        const ext = imageUrl.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i)?.[1] ?? "jpg";
+        storedPath = await saveImage({ buffer, originalname: `og.${ext}` }, req.user!.householdId, option.item_id);
+      } catch (e) {
+        console.error("[fetch-image option] saveImage failed, storing URL directly:", String(e));
+      }
     }
     const updated = await queryOne("UPDATE item_options SET image_path = $1 WHERE id = $2 RETURNING *", [storedPath, req.params.id]);
     res.json(updated);

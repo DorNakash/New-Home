@@ -2,7 +2,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 
-export const UPLOADS_ROOT = path.join(process.cwd(), "uploads");
+// /var/task is read-only on Vercel; fall back to /tmp (ephemeral but writable) when Blob not configured
+export const UPLOADS_ROOT = process.env.VERCEL
+  ? "/tmp/uploads"
+  : path.join(process.cwd(), "uploads");
 
 export async function saveImage(
   file: { buffer: Buffer; originalname: string },

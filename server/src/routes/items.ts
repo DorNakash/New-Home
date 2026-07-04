@@ -154,8 +154,13 @@ router.post("/:id/fetch-image", async (req, res) => {
     let storedPath: string = imageUrl;
     const buffer = await downloadImage(imageUrl, item.product_url);
     if (buffer) {
-      const ext = imageUrl.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i)?.[1] ?? "jpg";
-      storedPath = await saveImage({ buffer, originalname: `og.${ext}` }, req.user!.householdId, req.params.id);
+      try {
+        const ext = imageUrl.split("?")[0].match(/\.(jpe?g|png|webp|gif|avif)$/i)?.[1] ?? "jpg";
+        storedPath = await saveImage({ buffer, originalname: `og.${ext}` }, req.user!.householdId, req.params.id);
+      } catch (e) {
+        console.error("[fetch-image item] saveImage failed, storing URL directly:", String(e));
+        // storedPath stays as imageUrl — browser loads from CDN
+      }
     }
 
     const updated = await queryOne(
