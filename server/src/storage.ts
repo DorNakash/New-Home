@@ -174,7 +174,7 @@ export async function fetchOgImage(productUrl: string): Promise<string | null> {
     // 5. allorigins.win — Cloudflare Workers proxy
     attempt("allorigins", async () => {
       const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(productUrl)}`, {
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(3000),
       });
       if (!r.ok) return null;
       const d = await r.json() as { contents?: string; status?: { http_code: number } };
@@ -184,7 +184,7 @@ export async function fetchOgImage(productUrl: string): Promise<string | null> {
     // 6. corsproxy.io — independent proxy
     attempt("corsproxy", async () => {
       const r = await fetch(`https://corsproxy.io/?${encodeURIComponent(productUrl)}`, {
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(4000),
       });
       return r.ok ? toImg(await r.text()) : null;
     }),
