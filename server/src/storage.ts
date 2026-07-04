@@ -72,22 +72,25 @@ function extractOgImage(html: string, productUrl: string): string | null {
 
 export async function fetchOgImage(productUrl: string): Promise<string | null> {
   try {
-    // Microlink handles anti-bot, Cloudflare, and geo-blocked Israeli sites
+    // Microlink handles anti-bot and geo-blocked sites
     const ml = await fetch(
-      `https://api.microlink.io/?url=${encodeURIComponent(productUrl)}&javascript=true`,
-      { signal: AbortSignal.timeout(8000) }
+      `https://api.microlink.io/?url=${encodeURIComponent(productUrl)}`,
+      { signal: AbortSignal.timeout(6000) }
     ).catch(() => null);
     if (ml?.ok) {
       const body = await ml.json().catch(() => null) as { status: string; data?: { image?: { url?: string } } } | null;
+      console.log("[fetchOgImage] microlink:", body?.status, body?.data?.image?.url ?? "no image");
       if (body?.status === "success" && body.data?.image?.url) return body.data.image.url;
     }
   } catch { /* Microlink unavailable */ }
 
   try {
-    // Fallback: fetch HTML directly and parse og:image
+    // Fallback: fetch HTML directly (works for sites that don't block Vercel IPs)
     const direct = await fetch(productUrl, { headers: PAGE_HEADERS, signal: AbortSignal.timeout(2000) });
     if (direct.ok) {
-      const img = extractOgImage(await direct.text(), productUrl);
+      const html = await direct.text();
+      const img = extractOgImage(html, productUrl);
+      console.log("[fetchOgImage] direct html:", img ?? "no image");
       if (img) return img;
     }
   } catch { /* site blocked or timeout */ }
