@@ -43,6 +43,9 @@ export function ItemPage() {
   const [optionFormOpen, setOptionFormOpen] = useState(false);
   const [selectingId, setSelectingId] = useState<string | null>(null);
 
+  const selectedOptionImage = item?.options?.find(o => o.is_selected)?.image_path ?? null;
+  const displayImagePath = selectedOptionImage || item?.image_path || null;
+
   function openCreateOption() {
     setEditingOption(null);
     setOptionFormOpen(true);
@@ -113,9 +116,9 @@ export function ItemPage() {
       </div>
 
       {/* Image */}
-      <div className="group relative overflow-hidden rounded-xl bg-muted" style={{ height: item.image_path ? "240px" : "140px" }}>
-        {item.image_path ? (
-          <img src={imgSrc(item.image_path)!} alt={item.name} className="h-full w-full object-contain" />
+      <div className="group relative overflow-hidden rounded-xl bg-muted" style={{ height: displayImagePath ? "240px" : "140px" }}>
+        {displayImagePath ? (
+          <img src={imgSrc(displayImagePath)!} alt={item.name} className="h-full w-full object-contain" />
         ) : (
           <div className="flex h-full items-center justify-center">
             <ImageOff className="h-8 w-8 text-muted-foreground/30" />
@@ -123,7 +126,7 @@ export function ItemPage() {
         )}
 
         {!showManualInput && (
-          <div className={`absolute left-2 top-2 flex gap-1.5 transition-opacity ${item.image_path ? "opacity-0 group-hover:opacity-100" : "opacity-100"}`}>
+          <div className={`absolute left-2 top-2 flex gap-1.5 transition-opacity ${displayImagePath ? "opacity-0 group-hover:opacity-100" : "opacity-100"}`}>
             {item.product_url?.startsWith("http") && (
               <button
                 onClick={() => fetchImage.mutate(undefined, { onError: () => setShowManualInput(true) })}

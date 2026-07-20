@@ -60,10 +60,12 @@ router.get("/:id", async (req, res) => {
   if (!room) return res.status(404).json({ error: "החדר לא נמצא" });
 
   const items = await query(
-    `SELECT i.id, i.name, i.quantity, i.planned_price, i.actual_price, i.product_url, i.image_path,
+    `SELECT i.id, i.name, i.quantity, i.planned_price, i.actual_price, i.product_url,
+            COALESCE(o.image_path, i.image_path) AS image_path,
             i.notes, i.priority, i.status, i.is_required, i.category_id, i.store_id, s.name AS store_name
      FROM items i
      LEFT JOIN stores s ON s.id = i.store_id
+     LEFT JOIN item_options o ON o.id = i.selected_option_id
      WHERE i.room_id = $1 AND i.household_id = $2
      ORDER BY i.is_required DESC, i.created_at DESC`,
     [req.params.id, req.user!.householdId]
