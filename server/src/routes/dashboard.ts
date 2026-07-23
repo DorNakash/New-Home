@@ -15,6 +15,7 @@ router.get("/summary", async (req, res) => {
     total_planned: string | null;
     total_actual: string | null;
     total_spent: string | null;
+    total_planned_bought: string | null;
     item_count: string;
     done_count: string;
     installed_count: string;
@@ -25,6 +26,7 @@ router.get("/summary", async (req, res) => {
        COALESCE(SUM(planned_price), 0) AS total_planned,
        COALESCE(SUM(actual_price), 0) AS total_actual,
        COALESCE(SUM(actual_price) FILTER (WHERE status IN ('ORDERED', 'ARRIVED', 'INSTALLED')), 0) AS total_spent,
+       COALESCE(SUM(planned_price) FILTER (WHERE status IN ('ORDERED', 'ARRIVED', 'INSTALLED')), 0) AS total_planned_bought,
        COUNT(*) FILTER (WHERE status != 'CANCELLED') AS item_count,
        COUNT(*) FILTER (WHERE status IN ('ORDERED', 'ARRIVED', 'INSTALLED')) AS done_count,
        COUNT(*) FILTER (WHERE status = 'INSTALLED') AS installed_count,
@@ -59,6 +61,7 @@ router.get("/summary", async (req, res) => {
     totalPlanned: Number(totals?.total_planned ?? 0),
     totalActual: Number(totals?.total_actual ?? 0),
     totalSpent: Number(totals?.total_spent ?? 0),
+    totalPlannedBought: Number(totals?.total_planned_bought ?? 0),
     itemCount,
     installedCount,
     orderedCount: Number(totals?.ordered_count ?? 0),

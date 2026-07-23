@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Wallet, CreditCard, Package, ShoppingCart, Truck, CheckCircle2, Plus, Pencil, BadgeCheck } from "lucide-react";
+import { Wallet, CreditCard, Package, ShoppingCart, Truck, CheckCircle2, Plus, Pencil, BadgeCheck, PiggyBank } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -171,6 +171,19 @@ export function DashboardPage() {
           value={<Currency value={data.totalSpent ?? 0} />}
           colorClass="bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300"
           onClick={() => setItemsDialog({ title: "שולם עד כה", statuses: ["ORDERED", "ARRIVED", "INSTALLED"] })}
+        />
+        <SummaryCard
+          icon={CreditCard}
+          label="מתוכנן ממה שקניתי"
+          value={<Currency value={data.totalPlannedBought ?? 0} />}
+          colorClass="bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300"
+          onClick={() => setItemsDialog({ title: "מתוכנן ממה שקניתי", statuses: ["ORDERED", "ARRIVED", "INSTALLED"] })}
+        />
+        <SummaryCard
+          icon={PiggyBank}
+          label="חסכתי"
+          value={<Currency value={(data.totalPlannedBought ?? 0) - (data.totalSpent ?? 0)} />}
+          colorClass="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
         />
         <SummaryCard
           icon={CreditCard}

@@ -16,6 +16,7 @@ export interface DashboardSummary {
   totalPlanned: number;
   totalActual: number;
   totalSpent: number;
+  totalPlannedBought: number;
   itemCount: number;
   installedCount: number;
   orderedCount: number;
