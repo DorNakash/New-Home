@@ -71,6 +71,10 @@ Do not move any of this to the server. The file is parsed in the browser to avoi
 3. In `onSuccess`, invalidate all affected query keys
 4. Return the hook from a named export (`useDeleteItem`, `useUpdateRoom`, etc.)
 
+## Household-level costs on the dashboard
+
+`deliveryCost` and `installationCost` are global values stored on the household (not per item). They appear on the dashboard as `CostCard` components — inline editable cards identical in UX to `BudgetCard` (click pencil → input appears, blur or Enter saves, Escape cancels). Mutations are `useUpdateDeliveryCost` and `useUpdateInstallationCost` in `src/lib/queries/dashboard.ts`. Both call `PATCH /api/household` and invalidate `["dashboard-summary"]`.
+
 ## Common gotchas
 
 - `window.open(url, "_blank", "noopener,noreferrer")` — never use `render={<a>}` inside clickable cards; it doesn't propagate the click correctly

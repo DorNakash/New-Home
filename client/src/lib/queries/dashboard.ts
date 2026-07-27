@@ -13,6 +13,8 @@ export interface RoomSummary {
 
 export interface DashboardSummary {
   budget: number | null;
+  deliveryCost: number | null;
+  installationCost: number | null;
   totalPlanned: number;
   totalActual: number;
   totalSpent: number;
@@ -37,6 +39,24 @@ export function useUpdateBudget() {
   return useMutation({
     mutationFn: (budget: number | null) =>
       api("/api/household", { method: "PATCH", body: JSON.stringify({ budget }) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] }),
+  });
+}
+
+export function useUpdateDeliveryCost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (delivery_cost: number | null) =>
+      api("/api/household", { method: "PATCH", body: JSON.stringify({ delivery_cost }) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] }),
+  });
+}
+
+export function useUpdateInstallationCost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (installation_cost: number | null) =>
+      api("/api/household", { method: "PATCH", body: JSON.stringify({ installation_cost }) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] }),
   });
 }

@@ -34,7 +34,15 @@ SEARCHING → READY_TO_ORDER → ORDERED → ARRIVED → INSTALLED
 ```
 
 Progress % counts ORDERED + ARRIVED + INSTALLED as "done" (not just INSTALLED).
-`totalSpent` counts `actual_price` WHERE status IN ('ORDERED', 'ARRIVED', 'INSTALLED').
+`totalSpent` counts `actual_price` WHERE status IN ('ORDERED', 'ARRIVED', 'INSTALLED') **plus** the household-level `delivery_cost` and `installation_cost`.
+
+## Household-level costs
+
+`delivery_cost` and `installation_cost` are global numeric fields on the `households` table — not per item. They represent the total delivery and installation budget for the whole home, set manually by the user from the dashboard.
+
+`PATCH /api/household` accepts any combination of `budget`, `delivery_cost`, and `installation_cost` in the body. All three are optional in each call.
+
+`GET /api/dashboard/summary` returns `deliveryCost` and `installationCost` (nullable numbers) alongside `budget`, and adds both to `totalSpent`.
 
 ## Image storage (`src/storage.ts`)
 
