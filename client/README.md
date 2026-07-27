@@ -72,7 +72,7 @@ src/
 | Route | Page |
 |---|---|
 | `/login` | Login |
-| `/` | Dashboard (summary cards, room breakdown, progress bar) |
+| `/` | Dashboard (summary cards, room budget breakdown, progress bar, household cost editors) |
 | `/rooms/:roomId` | Room page (item card grid) |
 | `/items/:itemId` | Item detail (info + options tabs) |
 | `/stores` | Stores list |
@@ -100,7 +100,15 @@ React Query hooks live in `src/lib/queries/*.ts`. Query keys:
 ["categories"]
 ```
 
-After any mutation, invalidate the relevant keys. Dashboard summary must be invalidated whenever items or rooms change.
+After any mutation, invalidate the relevant keys. Dashboard summary must be invalidated whenever items, rooms, or household fields change.
+
+### Dashboard summary shape
+
+`useDashboardSummary` returns:
+- `budget`, `deliveryCost`, `installationCost` — nullable household-level globals (editable via pencil cards)
+- `totalPlanned`, `totalActual`, `totalSpent`, `totalPlannedBought` — item price aggregates; `totalSpent` includes household delivery + installation costs
+- `itemCount`, `installedCount`, `orderedCount`, `toBuyCount`, `percentComplete`
+- `rooms[]` — per-room `spent`, `planned`, `itemCount`, `percentComplete`
 
 ## Item status lifecycle
 

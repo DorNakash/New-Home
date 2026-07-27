@@ -97,7 +97,7 @@ All routes except `/api/auth/*` require a valid session cookie (`requireAuth` mi
 |---|---|---|
 | `GET/POST` | `/api/stores` | List / create stores |
 | `GET/POST` | `/api/categories` | List / create categories |
-| `GET/PATCH` | `/api/household` | Get / update household (name, budget) |
+| `GET/PATCH` | `/api/household` | Get / update household (name, budget, delivery_cost, installation_cost) |
 | `POST` | `/api/upload` | Upload image file for an item (multipart/form-data, field `file` + `itemId`) |
 | `POST` | `/api/import` | Bulk import items from Excel (parsed client-side, POSTed as JSON) |
 | `DELETE` | `/api/import` | Delete all items for this household |
@@ -107,6 +107,8 @@ All routes except `/api/auth/*` require a valid session cookie (`requireAuth` mi
 Schema lives in `src/db/schema.sql` — idempotent (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`). Run `npm run migrate` to apply.
 
 **Tables:** `households` → `users`, `rooms`, `categories`, `stores` → `items` → `item_options`
+
+Key household columns: `budget`, `delivery_cost`, `installation_cost` — all nullable numerics editable from the dashboard. `delivery_cost` and `installation_cost` are household-level totals (not per item) and are included in `totalSpent` returned by the dashboard summary.
 
 Every query is scoped to `household_id` derived from the JWT — never from client input.
 

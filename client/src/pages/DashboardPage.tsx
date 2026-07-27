@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Currency } from "@/components/items/Currency";
 import { RoomFormDialog } from "@/components/rooms/RoomFormDialog";
 import { ItemsListDialog } from "@/components/items/ItemsListDialog";
-import { useDashboardSummary, useUpdateBudget } from "@/lib/queries/dashboard";
+import { useDashboardSummary, useUpdateBudget, useUpdateDeliveryCost, useUpdateInstallationCost } from "@/lib/queries/dashboard";
 
 function SummaryCard({
   icon: Icon,
@@ -100,6 +100,73 @@ function BudgetCard({ budget }: { budget: number | null }) {
   );
 }
 
+function CostCard({
+  label,
+  value,
+  colorClass,
+  mutationFn,
+}: {
+  label: string;
+  value: number | null;
+  colorClass: string;
+  mutationFn: (v: number | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [inputVal, setInputVal] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function startEdit() {
+    setInputVal(value != null ? String(value) : "");
+    setEditing(true);
+  }
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  function save() {
+    const num = inputVal.trim() === "" ? null : Number(inputVal);
+    mutationFn(num);
+    setEditing(false);
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-3 py-4">
+        <div className={`flex h-9 w-9 items-center justify-center rounded-full ${colorClass}`}>
+          <Wallet className="h-4 w-4" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-muted-foreground">{label}</p>
+          {editing ? (
+            <div className="flex items-center gap-1 mt-0.5">
+              <Input
+                ref={inputRef}
+                type="number"
+                value={inputVal}
+                onChange={(e) => setInputVal(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+                onBlur={() => save()}
+                className="h-7 w-28 text-sm"
+                placeholder="0"
+              />
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <p className="font-medium">
+                {value != null ? <Currency value={value} /> : <span className="text-muted-foreground text-sm">לא הוגדר</span>}
+              </p>
+              <Button variant="ghost" size="icon-xs" onClick={startEdit} aria-label="ערוך">
+                <Pencil className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 const ROOM_ACCENTS = [
   "bg-rose-100 dark:bg-rose-900/40",
   "bg-emerald-100 dark:bg-emerald-900/40",
@@ -113,6 +180,8 @@ type ItemsDialog = { title: string; statuses?: string[] } | null;
 
 export function DashboardPage() {
   const { data, isLoading } = useDashboardSummary();
+  const updateDelivery = useUpdateDeliveryCost();
+  const updateInstallation = useUpdateInstallationCost();
   const navigate = useNavigate();
   const [editingRoom, setEditingRoom] = useState<{ id: string; name: string; icon: string | null } | null>(
     null
@@ -184,6 +253,18 @@ export function DashboardPage() {
           label="חסכתי"
           value={<Currency value={(data.totalPlannedBought ?? 0) - (data.totalSpent ?? 0)} />}
           colorClass="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+        />
+        <CostCard
+          label="עלות משלוחים"
+          value={data.deliveryCost}
+          colorClass="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
+          mutationFn={(v) => updateDelivery.mutate(v)}
+        />
+        <CostCard
+          label="עלות התקנות"
+          value={data.installationCost}
+          colorClass="bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
+          mutationFn={(v) => updateInstallation.mutate(v)}
         />
         <SummaryCard
           icon={CreditCard}

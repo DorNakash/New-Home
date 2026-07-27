@@ -6,8 +6,8 @@ const router = Router();
 router.use(requireAuth);
 
 router.get("/summary", async (req, res) => {
-  const household = await queryOne<{ budget: string | null }>(
-    "SELECT budget FROM households WHERE id = $1",
+  const household = await queryOne<{ budget: string | null; delivery_cost: string | null; installation_cost: string | null }>(
+    "SELECT budget, delivery_cost, installation_cost FROM households WHERE id = $1",
     [req.user!.householdId]
   );
 
@@ -58,9 +58,14 @@ router.get("/summary", async (req, res) => {
 
   res.json({
     budget: household?.budget != null ? Number(household.budget) : null,
+    deliveryCost: household?.delivery_cost != null ? Number(household.delivery_cost) : null,
+    installationCost: household?.installation_cost != null ? Number(household.installation_cost) : null,
     totalPlanned: Number(totals?.total_planned ?? 0),
     totalActual: Number(totals?.total_actual ?? 0),
-    totalSpent: Number(totals?.total_spent ?? 0),
+    totalSpent:
+      Number(totals?.total_spent ?? 0) +
+      (household?.delivery_cost != null ? Number(household.delivery_cost) : 0) +
+      (household?.installation_cost != null ? Number(household.installation_cost) : 0),
     totalPlannedBought: Number(totals?.total_planned_bought ?? 0),
     itemCount,
     installedCount,
