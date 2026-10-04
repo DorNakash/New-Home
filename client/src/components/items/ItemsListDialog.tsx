@@ -10,11 +10,12 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   title: string;
   statuses?: string[];
+  isRequired?: boolean;
 }
 
-export function ItemsListDialog({ open, onOpenChange, title, statuses }: Props) {
+export function ItemsListDialog({ open, onOpenChange, title, statuses, isRequired }: Props) {
   const navigate = useNavigate();
-  const { data, isLoading } = useDashboardItems({ statuses, enabled: open });
+  const { data, isLoading } = useDashboardItems({ statuses, isRequired, enabled: open });
 
   function handleItemClick(itemId: string) {
     onOpenChange(false);

@@ -71,11 +71,12 @@ export function useSearchItems(params: {
   });
 }
 
-export function useDashboardItems(params: { statuses?: string[]; enabled?: boolean }) {
+export function useDashboardItems(params: { statuses?: string[]; isRequired?: boolean; enabled?: boolean }) {
   const qs = new URLSearchParams();
   if (params.statuses?.length) qs.set("status", params.statuses.join(","));
+  if (params.isRequired !== undefined) qs.set("is_required", String(params.isRequired));
   return useQuery<SearchItem[]>({
-    queryKey: ["dashboard-items", params.statuses ?? "all"],
+    queryKey: ["dashboard-items", params.statuses ?? "all", params.isRequired],
     queryFn: () => api<SearchItem[]>(`/api/items?${qs}`),
     enabled: params.enabled !== false,
   });
