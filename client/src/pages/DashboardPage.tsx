@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Wallet, CreditCard, Package, ShoppingCart, Truck, CheckCircle2, Plus, Pencil, BadgeCheck, PiggyBank } from "lucide-react";
+import { Wallet, CreditCard, Package, ShoppingCart, Truck, CheckCircle2, Plus, Pencil, BadgeCheck, PiggyBank, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -176,7 +176,7 @@ const ROOM_ACCENTS = [
   "bg-teal-100 dark:bg-teal-900/40",
 ];
 
-type ItemsDialog = { title: string; statuses?: string[] } | null;
+type ItemsDialog = { title: string; statuses?: string[]; isRequired?: boolean } | null;
 
 export function DashboardPage() {
   const { data, isLoading } = useDashboardSummary();
@@ -301,6 +301,22 @@ export function DashboardPage() {
           colorClass="bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
           onClick={() => setItemsDialog({ title: "הותקן", statuses: ["INSTALLED"] })}
         />
+        <SummaryCard
+          icon={Sparkles}
+          label="קנייה עתידית"
+          value={
+            <span>
+              {data.futureBuyCount} פריטים
+              {data.futureBuyPlanned > 0 && (
+                <span className="text-xs text-muted-foreground me-1">
+                  {" "}· <Currency value={data.futureBuyPlanned} />
+                </span>
+              )}
+            </span>
+          }
+          colorClass="bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/40 dark:text-fuchsia-300"
+          onClick={() => setItemsDialog({ title: "קנייה עתידית", statuses: ["SEARCHING", "READY_TO_ORDER"], isRequired: false })}
+        />
       </section>
 
       <section>
@@ -364,6 +380,7 @@ export function DashboardPage() {
         onOpenChange={(open) => { if (!open) setItemsDialog(null); }}
         title={itemsDialog?.title ?? ""}
         statuses={itemsDialog?.statuses}
+        isRequired={itemsDialog?.isRequired}
       />
     </div>
   );

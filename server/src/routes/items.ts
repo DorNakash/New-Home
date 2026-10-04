@@ -34,7 +34,7 @@ function pickWritable(body: Record<string, unknown>) {
 }
 
 router.get("/", async (req, res) => {
-  const { q, status, room_id, category_id, priority, store_id } = req.query as Record<string, string>;
+  const { q, status, room_id, category_id, priority, store_id, is_required } = req.query as Record<string, string>;
 
   const conditions = ["i.household_id = $1"];
   const values: unknown[] = [req.user!.householdId];
@@ -53,6 +53,7 @@ router.get("/", async (req, res) => {
   if (category_id) { conditions.push(`i.category_id = $${idx++}`); values.push(category_id); }
   if (priority) { conditions.push(`i.priority = $${idx++}`); values.push(priority); }
   if (store_id) { conditions.push(`i.store_id = $${idx++}`); values.push(store_id); }
+  if (is_required !== undefined) { conditions.push(`i.is_required = $${idx++}`); values.push(is_required === "true"); }
 
   const items = await query(
     `SELECT i.*, r.name AS room_name, c.name AS category_name, s.name AS store_name

@@ -23,6 +23,8 @@ export interface DashboardSummary {
   installedCount: number;
   orderedCount: number;
   toBuyCount: number;
+  futureBuyCount: number;
+  futureBuyPlanned: number;
   percentComplete: number;
   rooms: RoomSummary[];
 }

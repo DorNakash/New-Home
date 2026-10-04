@@ -21,9 +21,11 @@ router.get("/summary", async (req, res) => {
     installed_count: string;
     ordered_count: string;
     to_buy_count: string;
+    future_buy_count: string;
+    future_buy_planned: string | null;
   }>(
     `SELECT
-       COALESCE(SUM(planned_price), 0) AS total_planned,
+       COALESCE(SUM(planned_price) FILTER (WHERE is_required = true OR status NOT IN ('SEARCHING', 'READY_TO_ORDER')), 0) AS total_planned,
        COALESCE(SUM(actual_price), 0) AS total_actual,
        COALESCE(SUM(actual_price) FILTER (WHERE status IN ('ORDERED', 'ARRIVED', 'INSTALLED')), 0) AS total_spent,
        COALESCE(SUM(planned_price) FILTER (WHERE status IN ('ORDERED', 'ARRIVED', 'INSTALLED')), 0) AS total_planned_bought,
@@ -31,7 +33,9 @@ router.get("/summary", async (req, res) => {
        COUNT(*) FILTER (WHERE status IN ('ORDERED', 'ARRIVED', 'INSTALLED')) AS done_count,
        COUNT(*) FILTER (WHERE status = 'INSTALLED') AS installed_count,
        COUNT(*) FILTER (WHERE status = 'ORDERED') AS ordered_count,
-       COUNT(*) FILTER (WHERE status IN ('SEARCHING', 'READY_TO_ORDER')) AS to_buy_count
+       COUNT(*) FILTER (WHERE status IN ('SEARCHING', 'READY_TO_ORDER')) AS to_buy_count,
+       COUNT(*) FILTER (WHERE is_required = false AND status IN ('SEARCHING', 'READY_TO_ORDER')) AS future_buy_count,
+       COALESCE(SUM(planned_price) FILTER (WHERE is_required = false AND status IN ('SEARCHING', 'READY_TO_ORDER')), 0) AS future_buy_planned
      FROM items
      WHERE household_id = $1`,
     [req.user!.householdId]
@@ -71,6 +75,8 @@ router.get("/summary", async (req, res) => {
     installedCount,
     orderedCount: Number(totals?.ordered_count ?? 0),
     toBuyCount: Number(totals?.to_buy_count ?? 0),
+    futureBuyCount: Number(totals?.future_buy_count ?? 0),
+    futureBuyPlanned: Number(totals?.future_buy_planned ?? 0),
     percentComplete,
     rooms: roomBreakdown.map((r) => ({
       id: r.id,
